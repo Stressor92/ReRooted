@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import uuid
 
@@ -35,6 +37,12 @@ class Event(Base):
     person = relationship("Person", back_populates="events")
     place = relationship("Place")
     citations = relationship("Citation", back_populates="event", cascade="all, delete-orphan")
+
+    @property
+    def place_name(self) -> str | None:
+        if self.place is None or self.place.name is None:
+            return None
+        return str(self.place.name)
 
     def __repr__(self) -> str:
         return f"<Event {self.event_type} person={self.person_id}>"

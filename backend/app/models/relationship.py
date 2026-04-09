@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import uuid
 
@@ -35,6 +37,10 @@ class Relationship(Base):
         back_populates="relationship",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def child_ids(self) -> list[str]:
+        return [str(child.child_id) for child in self.children]
 
     def __repr__(self) -> str:
         return f"<Relationship {self.rel_type} {self.person1_id} × {self.person2_id}>"

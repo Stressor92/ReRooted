@@ -1,0 +1,361 @@
+# ReRooted
+
+GUI · Spezifikation & Design-Konzept
+Frontend-Architektur  ·  Interaction Design  ·  Design System  ·  Templates
+
+Typ
+GUI-Spezifikation & Design-Konzept	Version
+1.0  ·  April 2025
+Scope
+React 18 + TypeScript + React Flow + Tailwind	Abhängigkeit
+Setzt fertiges Backend (FastAPI) voraus
+ 
+1	Design-Vision & Prinzipien
+
+
+ReRooted setzt auf ein dunkles, elegantes Canvas-Interface — das Stammbaum-Fenster ist kein Formular, sondern ein Erkundungsraum. Die Ästhetik kombiniert die Präzision moderner Graph-Tools (Figma, Miro) mit der Wärme eines Familien-Albums: dunkler Hintergrund als Bühne, Personenkarten als hell leuchtende Punkte, Verbindungslinien als strukturgebende Elemente.
+
+Das Leitprinzip ist Progressive Disclosure: Beim ersten Blick sieht man den Baum. Erst beim Hovern erscheinen Kurzinfos. Erst beim Klicken öffnet sich die volle Tiefe. Nichts drängt sich auf.
+
+Dunkel & Fokussiert
+Dunkles Canvas lenkt Aufmerksamkeit auf Inhalte. Personen-Cards leuchten heraus.	Kontextuell
+Aktionen erscheinen genau dort, wo sie gebraucht werden — kein separates Menü.	Skalierbar
+Von 5 bis 500 Personen — Auto-Layout und Zoom sorgen immer für Übersicht.
+ 
+2	Technologie-Stack Frontend
+
+
+Paket / Technologie	Zweck	Begründung
+React 18 + TypeScript	UI-Framework	Stabile Grundlage, exzellentes Ökosystem
+Vite 5	Build-Tool	Schnellste Dev-Experience, HMR
+@xyflow/react (React Flow v12)	Graph-Canvas	Zoom/Pan, Custom Nodes/Edges, Performance
+@dagrejs/dagre	Auto-Layout	Generationen-gerechtes Hierarchie-Layout
+Tailwind CSS v3	Styling	Utility-first, Design-Tokens via CSS-Vars
+Framer Motion	Animationen	Sidebar-Slide, Node-Hover, Modal-Transitions
+TanStack Query v5	Server State	Caching, Refetch, optimistic updates
+React Router v6	Routing	Nested Routes für Sidebar + Modal
+React Dropzone	Datei-Upload	Drag & Drop für PDFs und JPEGs
+react-pdf	PDF-Vorschau	PDFs inline im Dokumente-Reiter rendern
+Zustand	UI State	Canvas-Theme, aktives Template, Zoom-Level
+Axios	HTTP-Client	Interceptors für Error-Handling
+ 
+3	Layout-Architektur
+
+
+Die App besteht aus drei übereinanderliegenden Schichten, die unabhängig voneinander scrollen und zoomen:
+
+Schicht	Komponente	Inhalt
+Schicht 1 (Basis)	<CanvasLayer>	React-Flow-Canvas: Nodes + Edges + Hintergrund. Volle Viewport-Größe, kein Scroll.
+Schicht 2 (Overlay)	<ToolbarOverlay>	Schwebende Toolbar oben links (Zoom, Layout, Template-Picker, Hintergrund). position: absolute, pointer-events auf children beschränkt.
+Schicht 3 (Panel)	<PersonPanel>	Slide-in Sidebar rechts oder zentriertes Modal — öffnet sich beim Node-Klick. Überlagert Canvas, Canvas bleibt bedienbar.
+
+Responsive Breakpoints
+Breakpoint	Canvas	Panel
+≥ 1280px (Desktop)	Volle Breite minus Panel	Sidebar rechts, 420px breit, slide-in
+768–1279px (Tablet)	Volle Breite	Modal zentriert, 92vw breit
+< 768px (Mobil)	Volle Breite	Fullscreen Bottom Sheet (90vh)
+ 
+4	Person-Node — Visual Design
+
+
+Jede Person ist ein Custom Node in React Flow. Der Node besteht aus drei Zonen: Foto, Textblock, Status-Indikatoren. Das Design ist bewusst kompakt (Standard 160 × 200 px), damit auch große Bäume übersichtlich bleiben.
+
+4.1  Anatomie des Nodes
+Zone	Inhalt	Detail
+Foto	Rundes Profilbild (80×80 px)	border-radius: 50%, border: 3px solid #000, box-shadow: 0 4px 16px rgba(0,0,0,0.55). Fallback: Initialen-Kreis in Akzentfarbe.
+Name	Vor- und Nachname	font-weight: 600, font-size: 13px, max 2 Zeilen, ellipsis bei Überlauf
+Lebensdaten	* 15.04.1923  †  12.09.1987	font-size: 11px, gedämpfte Farbe. Nur Geburtsjahr wenn kein volles Datum. Sterbedatum optional.
+Status-Badge	Lebt / Verstorben / Privat	Kleiner farbiger Punkt oben rechts: grün=lebt, grau=verstorben, orange=privat/unbekannt
+Hover-Glow	Weicher Leuchteffekt	box-shadow erweitert sich beim Hover — CSS-Transition 200ms. Zeigt Klickbarkeit.
+Handles	React-Flow-Verbindungspunkte	Top (Eltern-Eingang) + Bottom (Kinder-Ausgang), unsichtbar außer beim Edge-Zeichnen
+
+4.2  Größenmodi
+Modus	Auslöser	Darstellung
+Standard	Zoom > 60%	Foto + Name + Lebensdaten (160×200px)
+Kompakt	Zoom 30–60%	Foto + Name, keine Daten (120×140px)
+Mikro	Zoom < 30%	Nur Foto als Kreis (64×64px) — kein Text
+
+4.3  CSS-Klassenstruktur
+.person-node {
+  width: 160px; border-radius: 14px;
+  background: var(--node-bg);        /* via Template-Config */
+  border: 1px solid var(--node-border);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  padding: 16px 12px 12px;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.person-node:hover {
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 32px rgba(0,0,0,0.5);
+  transform: translateY(-2px);
+}
+.person-node__photo {
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 3px solid #000;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.55);
+  object-fit: cover;
+}
+ 
+5	Edge-System — Beziehungslinien
+
+
+Jeder Beziehungstyp hat eine eindeutige visuelle Signatur aus Farbe, Linienstil und Pfeilform. Die Kombination dieser drei Eigenschaften ist redundant — Nutzer mit Farbsehschwäche können Beziehungen trotzdem unterscheiden.
+
+Typ	Farbe	Linienstil	Pfeilform	Label
+Kind (biologisch)	#888780 Grau	Durchgezogen, 2px	Ausgefüllter Pfeil ▶	Kind
+Ehe / Partnerschaft	#1D9E75 Grün	Durchgezogen, 2.5px	Horizontale Klammer	Ehe
+Getrennt / Ex	#1D9E75 Grün	Gestrichelt 8-4, 1.5px	Gestrichelter Pfeil	Getrennt
+Adoption	#BA7517 Amber	Gestrichelt 6-3, 2px	Offener Pfeil ▷	Adoptiert
+Pflegekind	#D85A30 Koralle	Gestrichelt 4-4, 1.5px	Rauten-Pfeil ◇	Pflege
+Unbekannt	#B4B2A9 Hell-Grau	Gepunktet 2-4, 1px	Kein Pfeil	Unbekannt
+
+5.1  Edge-Labels
+Jede Edge trägt ein kleines, klickbares Label in der Mitte der Linie. Standard: kurzer Typ-Name (z.B. 'Ehe'). Beim Hover zeigt das Label zusätzlich Zeitraum (z.B. '1988 – 2003') und einen Edit-Button. Das Label ist eine eigenständige React-Flow-EdgeLabel-Komponente.
+
+5.2  Interaktives Edge-Zeichnen
+Neue Beziehungen können direkt im Canvas gezeichnet werden: Handle an einem Node ziehen → Verbindungslinie folgt der Maus → auf Ziel-Node loslassen → Beziehungstyp-Dialog öffnet sich als kleines Popover. So entsteht keine Unterbrechung des Arbeitsflows.
+
+5.3  React Flow Edge-Konfiguration
+// features/tree/edges/FamilyEdge.tsx
+const EDGE_STYLES: Record<RelType, EdgeStyle> = {
+  biological: { stroke: '#888780', strokeWidth: 2, strokeDasharray: undefined },
+  marriage:   { stroke: '#1D9E75', strokeWidth: 2.5 },
+  divorced:   { stroke: '#1D9E75', strokeWidth: 1.5, strokeDasharray: '8 4' },
+  adoption:   { stroke: '#BA7517', strokeWidth: 2,   strokeDasharray: '6 3' },
+  foster:     { stroke: '#D85A30', strokeWidth: 1.5, strokeDasharray: '4 4' },
+  unknown:    { stroke: '#B4B2A9', strokeWidth: 1,   strokeDasharray: '2 4' },
+};
+ 
+6	Canvas & Hintergrund-Gestaltung
+
+
+Der Canvas-Hintergrund ist vollständig konfigurierbar und wird in der Template-Config gespeichert. Jedes Template definiert einen eigenen Hintergrundstil.
+
+Typ	Umsetzung	Beispiel
+Einfarbig	CSS background-color via Template-Variable	#1A1A1A Dunkel (Standard)
+Gepunktet	React-Flow <Background variant='dots'>	Helle Punkte auf Dunkel
+Liniert	React-Flow <Background variant='lines'>	Dezentes Raster
+Kreuz-Raster	React-Flow <Background variant='cross'>	Professionelles Grid
+Verlauf	CSS radial-gradient via style-prop	Dunkelgrün → Schwarz (Natur-Template)
+Benutzerfoto	CSS background-image, blur(8px), opacity 0.15	Altes Familienfoto als dezenter Hintergrund
+
+6.1  Zoom-Verhalten
+•	Initialer Zoom: fitView() — der gesamte Baum wird beim Laden so eingepasst, dass alle Nodes sichtbar sind
+•	Min-Zoom: 0.05 (500 Personen noch navigierbar)
+•	Max-Zoom: 3.0 (einzelne Node-Details lesbar)
+•	Zoom-Stufen-Snapping: optional ein/ausschaltbar (20%, 50%, 100%, 150%)
+•	Keyboard-Shortcuts: Ctrl+0 → fitView, Ctrl++ / Ctrl+- für Zoom-Stufen
+•	MiniMap: React-Flow MiniMap unten rechts, zeigt alle Nodes als farbige Punkte
+ 
+7	Design-Templates & Konfigurationssystem
+
+
+Das Template-System erlaubt es, das gesamte visuelle Erscheinungsbild mit einer einzigen Auswahl zu wechseln. Templates sind JSON-Dateien, die alle CSS-Variablen für Farben, Schatten und Typografie definieren. Eigene Templates können aus bestehenden abgeleitet und gespeichert werden.
+
+7.1  Vorkonfigurierte Templates
+Template	Canvas	Node-Stil	Zielgruppe
+Night Forest (Standard)	Sehr dunkles Grün #0D1B0F, Punktraster	Weiße Cards, grüner Akzent	Universell, elegant
+Classic Paper	Elfenbein #F8F4EC, Liniert	Beige Cards, braune Ränder	Historische Stammbäume
+Arctic Blue	Dunkles Blau #0A1628, Kreuzraster	Hellblaue Cards	Modern, professionell
+Sepia Heritage	Dunkles Braun #1C1208, gepunktet	Warme Amber-Cards	Vintage-Feeling
+Minimal Light	Weiß #FAFAFA, dezentes Raster	Weiße Cards, graue Schatten	Maximale Lesbarkeit
+Benutzerdefiniert	Beliebig (Farbpicker)	Alle Werte frei wählbar	Persönliche Gestaltung
+
+7.2  Template-Config-Schema
+// design/templates/NightForest.ts
+export const NightForestTemplate: DesignTemplate = {
+  id: 'night-forest',
+  name: 'Night Forest',
+  canvas: {
+    background: '#0D1B0F',
+    backgroundType: 'dots',
+    dotColor: 'rgba(29,158,117,0.25)',
+  },
+  node: {
+    background: '#1A2B1C',
+    border: '#2A4A2D',
+    borderWidth: 1,
+    borderRadius: 14,
+    shadow: '0 4px 20px rgba(0,0,0,0.4)',
+    photoBorder: '#000000',
+    photoBorderWidth: 3,
+    nameColor: '#E8F5E9',
+    dateColor: '#81C784',
+  },
+  accent: '#1D9E75',
+  fontFamily: 'Inter, sans-serif',
+};
+
+7.3  Template-Wechsel
+Der Template-Picker ist eine schwebende Toolbar-Sektion oben links. Er zeigt Vorschau-Thumbnails der Templates als kleine Canvas-Previews (80×50 px). Ein Klick wechselt sofort das aktive Template — der Wechsel ist animiert (300ms CSS-Transition auf alle CSS-Variablen).
+ 
+8	Person-Panel — Detail-Ansicht
+
+
+Das Person-Panel öffnet sich beim Klick auf einen Node als Slide-in-Sidebar (Desktop) oder Modal (Tablet/Mobil). Es ist in 4 Reiter unterteilt, die mit Framer Motion sanft animiert wechseln.
+
+8.1  Panel-Header (immer sichtbar, kein Reiter)
+Element	Detail
+Großes Profilbild	160×160 px, rund, schwarzer Rand, Schlagschatten — klickbar zum Ersetzen
+Vollständiger Name	24px, font-weight 700, editierbar per Doppelklick
+Lebensdaten kompakt	* Datum Ort  †  Datum Ort — einzeilig, 14px
+Status-Indikator	Lebt / Verstorben / Unbekannt als farbiger Badge
+Schnellaktionen	Drei Icon-Buttons: Bearbeiten, Beziehung hinzufügen, Person löschen
+Schließen-Button	X oben rechts, Escape-Key schließt Panel ebenfalls
+
+8.2  Reiter 1 — Persönliche Informationen
+Feld	Typ	Bemerkung
+Vorname / Nachname	Text-Input	Inline-Edit durch Doppelklick im Header
+Geburtsdatum	FlexDateInput	Akzeptiert: '15.04.1923', 'ca. 1920', 'vor 1900'
+Geburtsort	PlaceAutocomplete	Sucht in places-Tabelle, Inline-Anlage möglich
+Sterbedatum	FlexDateInput (optional)	Wird nur angezeigt wenn befüllt oder is_living=false
+Sterbeort	PlaceAutocomplete (optional)	Wie Geburtsort
+Lebt / Verstorben	3-Zustand-Toggle	Unbekannt → Lebt → Verstorben
+Lebensgeschichte	Markdown-Textarea	SimpleMDE-Lite Editor, Preview-Modus umschaltbar
+Beziehungen	Read-only Liste	Alle Beziehungen dieser Person mit Typ-Badge und Link zu Partner
+Ereignis-Timeline	Zeitstrahl-Komponente	Alle Events dieser Person (US-007), klickbar und ergänzbar
+
+8.3  Reiter 2 — Fotos & Galerie
+•	Masonry-Grid (2 Spalten) aller hochgeladenen Fotos
+•	Hauptfoto (Profilbild) ist mit einem Stern-Icon markiert — Klick auf anderes Foto macht es zum Profilbild
+•	Upload via Drag & Drop Zone oder Datei-Dialog — akzeptiert .jpg, .jpeg, .png, .webp
+•	Klick auf Foto → Lightbox-Vollbild-Ansicht mit Navigations-Pfeilen
+•	Jedes Foto hat ein Beschriftungsfeld (Bildunterschrift, Datum, Ort)
+•	Löschen-Button auf jedem Foto (mit Bestätigungs-Dialog)
+
+8.4  Reiter 3 — Dokumente
+•	Tabellarische Ansicht aller hochgeladenen Dokumente mit Dateiname, Typ-Icon, Datum
+•	Drag & Drop Upload-Zone für .pdf-Dateien (und .jpg als Scan-Alternative)
+•	PDF-Inline-Vorschau: Klick auf Dokument öffnet es mit react-pdf im selben Panel
+•	Dokument-Kategorisierung: Geburtsurkunde, Heiratsurkunde, Testament, Foto, Sonstiges
+•	Verknüpfung mit Ereignis möglich: Dokument kann als Quelle (Citation) für ein Ereignis markiert werden
+•	Download-Button für jedes Dokument
+
+8.5  Reiter 4 — Quellen & Belege
+•	Liste aller Citations dieser Person und ihrer Ereignisse
+•	Für jede Citation: Quelle, Seite, Vertrauensgrad (●●● / ●●○ / ●○○), verlinktes Ereignis
+•	Neue Quelle anlegen: inline Formular mit Titel, Autor, Jahr, URL, optionalem Datei-Upload
+•	Vertrauensgrad per Klick ändern
+ 
+9	Neue Personen & Beziehungen anlegen
+
+
+9.1  Drei Eingabewege
+Weg	Auslöser	Ablauf
+Kontextmenü (Rechtsklick)	Rechtsklick auf bestehenden Node	Menü mit: + Kind, + Partner, + Elternteil, + Geschwister → Formular öffnet sich vorausgefüllt
+Handle-Drag	Handle (Verbindungspunkt) eines Nodes ziehen	Maus auf leere Fläche loslassen → Quick-Add-Popover erscheint → Person anlegen + Beziehung in einem Schritt
+Toolbar-Button	+ Person in der schwebenden Toolbar	Leeres Formular ohne Vorausfüllung, Person landet als isolierter Node
+
+9.2  Quick-Add-Formular
+Das Quick-Add-Formular erscheint als kleines Popover direkt im Canvas (nicht als Sidebar). Es fragt nur das Nötigste: Vorname, Nachname, Geburtsjahr. Ein 'Vollständig bearbeiten'-Link öffnet das vollständige Person-Panel. Das Formular wird sofort via TanStack Query optimistisch in die UI eingefügt — der API-Call passiert im Hintergrund.
+
+9.3  Beziehungstyp-Dialog
+Nach dem Anlegen einer neuen Verbindung (Handle-Drag oder Kontextmenü) erscheint ein kleines Popover zur Auswahl des Beziehungstyps. Es zeigt alle Typen als Icon-Buttons mit kurzem Label. Der gewählte Typ bestimmt sofort die visuelle Edge-Darstellung. Zeitraum-Eingabe (von/bis) ist optional und kann jederzeit nachgetragen werden.
+ 
+10	Schwebende Toolbar
+
+
+Die Toolbar schwebt oben links über dem Canvas (position: absolute, z-index: 10). Sie ist in Gruppen unterteilt und kollabierbar um den Canvas freizugeben.
+
+Gruppe	Elemente
+Navigation	Zoom In (+), Zoom Out (−), Fit View (⊡), Zoom-Prozent-Anzeige
+Layout	Neu berechnen (dagre), Horizontales / Vertikales Layout umschalten
+Darstellung	Template-Picker (5 Thumbnails), Hintergrund-Typ (gepunktet/liniert/leer)
+Personen	+ Person hinzufügen, Suche (Suchfeld, springt zu Person)
+Import/Export	GEDCOM importieren, GEDCOM exportieren, Als Bild speichern (PNG)
+
+10.1  Suche & Fokus
+Die Toolbar-Suche filtert Nodes in Echtzeit (Debounce 300ms). Nicht-gefundene Nodes werden auf 20% Deckkraft reduziert, der gefundene Node wird hervorgehoben und die View springt via React Flow flyTo() zur Position der Person.
+ 
+11	Interaktionen & Animationen
+
+
+Interaktion	Verhalten	Implementierung
+Node Hover	Glow-Effekt, Cursor ändert sich zu pointer	CSS transition 200ms, box-shadow erweitert
+Node Klick	Panel slide-in von rechts	Framer Motion: x: 420 → 0, opacity 0 → 1, 280ms ease-out
+Panel schließen	Slide-out nach rechts	Framer Motion: x: 0 → 420, opacity 1 → 0, 220ms ease-in
+Reiter wechseln	Inhalt faded sanft	Framer Motion AnimatePresence, opacity 0→1, 150ms
+Template wechseln	Alle CSS-Variablen wechseln	CSS transition: background 400ms, color 300ms
+Neuer Node	Node springt ein	React Flow: opacity 0 → 1, scale 0.8 → 1, 300ms
+Edge zeichnen	Linie folgt Maus in Echtzeit	React Flow onConnect, temporäre Edge bis Loslassen
+Zoom	Smooth scrolling	React Flow wheelZoom, zoomOnPinch für Touch
+Drag & Drop Upload	Dropzone leuchtet grün auf	react-dropzone isDragActive → border-color: #1D9E75
+ 
+12	React-Komponentenstruktur
+
+
+src/features/tree/
+  TreePage.tsx              — Haupt-Route, orchestriert alle Schichten
+  TreeCanvas.tsx            — React Flow Canvas + Event-Handler
+  CanvasBackground.tsx      — Hintergrund aus Template-Config
+  PersonNode.tsx            — Custom Node mit 3 Zoom-Größenmodi
+  FamilyEdge.tsx            — Custom Edge mit Typ-Styling + Label
+  EdgeLabel.tsx             — Klickbares Label mit Hover-Details
+  useLayout.ts              — dagre Auto-Layout Hook
+  useCanvasSearch.ts        — Suche + flyTo Logik
+ 
+src/features/persons/
+  PersonPanel.tsx           — Slide-in Sidebar / Modal Wrapper
+  PersonPanelHeader.tsx     — Foto + Name + Schnellaktionen
+  tabs/
+    InfoTab.tsx             — Persönliche Infos + Timeline
+    PhotosTab.tsx           — Galerie + Upload
+    DocumentsTab.tsx        — PDF-Liste + Drag&Drop + Vorschau
+    SourcesTab.tsx          — Citations Liste + Neue Quelle
+ 
+src/features/persons/forms/
+  QuickAddPopover.tsx       — Canvas-Popover für schnelles Anlegen
+  PersonForm.tsx            — Vollständiges Formular (Sidebar)
+  RelationshipDialog.tsx    — Beziehungstyp-Auswahl nach Edge-Draw
+  PlaceAutocomplete.tsx     — Orts-Suche mit Debounce
+  FlexDateInput.tsx         — Flexible Datumseingabe
+ 
+src/design/
+  templates/                — NightForest.ts, ClassicPaper.ts, ...
+  TemplatePicker.tsx        — Thumbnail-Auswahl in Toolbar
+  tokens.css                — CSS Custom Properties
+ 
+src/components/
+  CanvasToolbar.tsx         — Schwebende Toolbar-Leiste
+  Lightbox.tsx              — Foto-Vollbild
+  ConfirmDialog.tsx         — Löschen-Bestätigung
+  StatusBadge.tsx           — Lebt/Verstorben/Unbekannt Badge
+ 
+13	Implementierungs-Prompt für KI-Agenten
+
+
+Der folgende Prompt kann direkt an einen Coding-Agenten übergeben werden, um das gesamte Frontend von dieser Spezifikation aus zu implementieren:
+
+Kontext & Auftrag
+Du implementierst das vollständige React-Frontend von "ReRooted" auf Basis der GUI-Spezifikation v1.0. Das Backend (FastAPI) ist fertig und liefert: GET /tree → {nodes, edges}, GET/POST /persons, GET /persons/{id} mit events, GET /places?q=, POST /files/upload, POST /import/gedcom.
+Tech-Stack (nicht abweichen)
+React 18 + TypeScript + Vite, @xyflow/react v12, @dagrejs/dagre, Tailwind CSS v3, Framer Motion, TanStack Query v5, React Router v6, React Dropzone, Zustand, Axios.
+Priorität 1 — Canvas & Nodes
+TreeCanvas.tsx mit React Flow. PersonNode.tsx mit rundem Foto (border-radius:50%, border:3px solid #000, box-shadow:0 4px 16px rgba(0,0,0,.55)), Name, Lebensdaten, Status-Dot. Drei Zoom-Größenmodi (Standard/Kompakt/Mikro). useLayout.ts mit dagre rankdir:TB. Initialer fitView().
+Priorität 2 — Edges & Templates
+FamilyEdge.tsx mit 6 Typen (biological/marriage/divorced/adoption/foster/unknown) — je eigene Farbe, strokeDasharray, Pfeilform. EdgeLabel.tsx klickbar mit Hover-Detail. Template-System mit CSS-Variablen und NightForest als Standard-Template. TemplatePicker.tsx in der Toolbar.
+Priorität 3 — Person-Panel
+PersonPanel.tsx als Framer Motion Slide-in (x: 420→0). 4 Reiter: Info, Fotos, Dokumente, Quellen. Drag&Drop Upload via React Dropzone. PDF-Vorschau via react-pdf. Lightbox für Fotos. Inline-Bearbeitung per Doppelklick auf Felder.
+Priorität 4 — Neue Personen anlegen
+Drei Wege: Rechtsklick-Kontextmenü auf Node, Handle-Drag auf leere Fläche, Toolbar-Button. QuickAddPopover.tsx direkt im Canvas. RelationshipDialog.tsx für Beziehungstyp. Optimistic Updates via TanStack Query.
+Design-Anforderungen (nicht verhandelbar)
+•	Canvas-Hintergrund: #0D1B0F (Night Forest Standard), konfigurierbar
+•	Node-Karten: dunkle Oberfläche, weißer Text, Profilbild rund mit schwarzem Rand + Schatten
+•	Hover: box-shadow erweitert sich, leichte translateY(-2px) — CSS transition 200ms
+•	Panel-Animation: Framer Motion slide-in von rechts, 280ms ease-out
+•	Alle Farben via CSS Custom Properties — Template-Wechsel ohne JS-Neurender
+ 
+14	Zusammenfassung & nächste Schritte
+
+
+ReRooted setzt einen neuen Standard für Genealogie-Interfaces. Die Kombination aus dunklem, fokussiertem Canvas, präziser Edge-Typisierung und dem Template-System ergibt ein Tool, das gleichzeitig professionell und zugänglich ist.
+
+Phase	Komponenten	Ergebnis
+FE-1	TreeCanvas, PersonNode, FamilyEdge, useLayout	Stammbaum wird angezeigt und ist zoombar
+FE-2	TemplatePicker, CanvasToolbar, CSS-Variablen	Template-Wechsel funktioniert
+FE-3	PersonPanel mit 4 Reitern, Framer Motion	Detailansicht vollständig
+FE-4	QuickAdd, Kontextmenü, RelationshipDialog	Neue Personen und Beziehungen anlegbar
+FE-5	Drag&Drop, PDF-Vorschau, Lightbox	Medien-Verwaltung vollständig
+FE-6	GEDCOM-Import UI, Suche, MiniMap	Alle Features des MVP vollständig
+
+ReRooted — weil jede Familie eine Bühne verdient.
+

@@ -1,0 +1,530 @@
+# ReRooted
+
+Dokumenttyp
+Technische Gesamtspezifikation	Version
+1.0  ·  April 2025
+Status
+Finalisiert — bereit zur Implementierung	User Stories
+23 Stories in 8 Epics
+ 
+1. Executive Summary
+
+Stammbaum ist eine moderne, web-basierte Genealogie-Anwendung, die als schlanke und visuell hochwertige Alternative zu bestehenden Desktop-Tools wie Gramps entwickelt wird. Der Fokus liegt auf intuitiver Bedienbarkeit, einer ansprechenden grafischen Darstellung von Familienstammbäumen und der korrekten Abbildung komplexer Familienstrukturen inklusive Patchworkfamilien.
+
+Das System basiert auf bewährten Konzepten der Genealogie-Software-Entwicklung — insbesondere dem ereignis-zentrischen Datenmodell und der Ortsreferenzierung aus Gramps — und implementiert diese mit einem modernen, zukunftssicheren Technologiestack. GEDCOM-Import ermöglicht die Migration bestehender Daten aus Gramps, Ancestry und vergleichbaren Tools.
+
+FastAPI + React
+Moderner Technologiestack	React Flow
+Interaktiver Graph-Baum	GEDCOM
+Gramps-kompatibel
+ 
+2. Gramps-Analyse und Konzeptübertragung
+
+Gramps (Genealogical Research and Analysis Management Programming System) ist seit 2001 die führende Open-Source-Desktop-Genealogiesoftware. Die Analyse von Gramps bildet die Grundlage für die Architekturentscheidungen dieses Projekts.
+
+2.1 Lizenzanalyse — Warum kein Fork
+Gramps steht unter der GPL-2.0-or-later-Lizenz. Ein Fork würde das gesamte Projekt unter dieselbe Lizenz zwingen und den gesamten Quellcode offenlegungspflichtig machen. Zusätzlich ist Gramps eine 24 Jahre alte GTK-Desktop-Anwendung in Python — technologisch inkompatibel mit dem gewünschten Web-First-Ansatz.
+
+Entscheidung: Eigenentwicklung mit Konzeptübernahme. Ideen, Datenmodelle und Konzepte sind nicht urheberrechtlich geschützt.
+
+2.2 Übernommene Konzepte
+Konzept	Übernahme	Begründung
+Ereignis-zentrisches Modell	Vollständig	Geburt, Tod etc. als eigenständige Entitäten — flexibler als Felder
+Orte als eigene Entität	Vollständig	Verhindert Duplikate, ermöglicht Kartenansicht in Phase 2
+GEDCOM-Import	5.5.1 (Subset)	Migrationspfad für Gramps/Ancestry-Nutzer
+Quellenangaben (Citations)	Vereinfacht	Grundprinzip übernommen, komplexe Quellen-Templates weggelassen
+Datenschutz-Flag (is_living)	Vollständig	Automatische Anonymisierung beim GEDCOM-Export
+Plugin-System	Nicht übernommen	Zu komplex für MVP, schafft unnötigen Overhead
+45 Sprachen, Kalender-Systeme	Nicht übernommen	Deutsch/Englisch für MVP ausreichend
+ 
+3. Systemarchitektur
+
+3.1 Gesamtübersicht
+Das System folgt einer klassischen Client-Server-Architektur mit klarer Schichtentrennung im Backend und einer komponentenbasierten Frontend-Architektur.
+
+Frontend (React + Vite + TypeScript)
+React Flow · TanStack Query · Axios · dagre
+REST API  /  JSON
+API Layer (FastAPI + Pydantic)
+Routing · Validierung · Serialisierung
+↓
+Service Layer
+tree_service · gedcom_service · person_service
+↓
+Datenbank (SQLite + SQLAlchemy ORM)
+persons · events · places · relationships · sources · files
+
+3.2 Projektstruktur
+
+Backend	Frontend
+backend/
+  app/
+    main.py
+    core/
+      config.py
+      database.py
+    models/
+      person.py
+      event.py
+      place.py
+      relationship.py
+      source.py
+      file.py
+    schemas/
+    api/
+      persons.py
+      events.py
+      places.py
+      relationships.py
+      tree.py
+      gedcom.py
+    services/
+      person_service.py
+      tree_service.py
+      gedcom_service.py
+    utils/
+      date_parser.py
+  requirements.txt	frontend/
+  src/
+    main.tsx
+    App.tsx
+    design/
+      tokens.css
+    layouts/
+      AppLayout.tsx
+    pages/
+      TreePage.tsx
+      PersonsPage.tsx
+      ImportPage.tsx
+    features/
+      tree/
+        TreeView.tsx
+        PersonNode.tsx
+        FamilyEdge.tsx
+      persons/
+        PersonForm.tsx
+        PersonSidebar.tsx
+        EventTimeline.tsx
+    components/
+      PlaceAutocomplete.tsx
+      FlexDateInput.tsx
+    api/
+      client.ts
+    hooks/
+      usePersons.ts
+      useTree.ts
+ 
+4. Datenmodell
+
+Das relationale Datenmodell bildet einen Graphen über die Tabellen ab. Beziehungen sind eigenständige Entitäten, Kinder werden nicht direkt an Personen, sondern an Beziehungen gebunden.
+
+Tabelle	Herkunft	Wichtigste Felder
+places	Gramps	id, name, full_name, latitude, longitude, gramps_id
+persons	Konzept	id, first_name, last_name, is_living, birth_place_id FK, description, gramps_id
+events	Gramps	id, person_id FK, event_type, date_text, date_sort, place_id FK, description, is_private
+relationships	Konzept	id, person1_id FK, person2_id FK, rel_type, start_date, end_date
+relationship_children	Konzept	relationship_id FK, child_id FK (Composite PK)
+sources	Gramps	id, title, author, date, url, file_id FK
+citations	Gramps	id, source_id FK, person_id FK?, event_id FK?, page, confidence
+files	Konzept	id, filename, content_type, path
+person_images	Konzept	id, person_id FK, file_id FK, is_profile
+ 
+5. API-Spezifikation
+
+Alle Endpunkte folgen REST-Konventionen. Eingaben werden durch Pydantic validiert, Ausgaben als JSON serialisiert.
+
+Methode	Endpunkt	Beschreibung
+GET	/persons	Alle Personen auflisten
+POST	/persons	Person anlegen
+GET	/persons/{id}	Person mit Ereignissen und Beziehungen
+PUT	/persons/{id}	Person aktualisieren
+DELETE	/persons/{id}	Person löschen (kaskadierend)
+GET	/persons/{id}/events	Alle Ereignisse einer Person
+POST	/persons/{id}/events	Ereignis hinzufügen
+PUT	/events/{id}	Ereignis aktualisieren
+DELETE	/events/{id}	Ereignis löschen
+GET	/places?q={query}	Orte suchen (Autocomplete)
+POST	/places	Neuen Ort anlegen
+GET	/relationships	Alle Beziehungen
+POST	/relationships	Beziehung anlegen
+POST	/relationships/{id}/children/{child_id}	Kind zuordnen
+DELETE	/relationships/{id}/children/{child_id}	Kind entfernen
+GET	/sources	Alle Quellen
+POST	/sources	Quelle anlegen
+POST	/events/{id}/citations	Zitation zu Ereignis hinzufügen
+GET	/tree	Graph-Daten für React Flow
+POST	/files/upload	Datei-Upload (Bilder, Dokumente)
+GET	/files/{id}	Datei abrufen
+POST	/import/gedcom/preview	GEDCOM analysieren (kein Commit)
+POST	/import/gedcom	GEDCOM importieren
+GET	/export/gedcom	GEDCOM exportieren
+ 
+6. User Stories
+
+Alle 23 User Stories sind in 8 Epics organisiert. Stories mit dem Vermerk ★ aus Gramps-Analyse wurden durch die Konzeptanalyse von Gramps inspiriert und verbessern die Datenqualität und Kompatibilität erheblich.
+
+Epic	Bezeichnung	Stories	Schlüsselfunktion
+E1	Projekt-Setup	2	Infrastruktur, DB-Schema, Frontend-Grundgerüst
+E2	Personenverwaltung	3	CRUD, Profilbilder, Suchfunktion
+E3	Ereignisse (Gramps)	3	Ereignis-zentriertes Modell, flexible Datumsangaben
+E4	Orte (Gramps)	2	Orte als Entitäten, Autocomplete
+E5	Beziehungen	2	Patchworkfamilien, Kinder an Beziehungen
+E6	Stammbaum-Visualisierung	5	React Flow, dagre, Custom Nodes
+E7	Quellenangaben (Gramps)	2	Sources, Citations, Vertrauensgrad
+E8	GEDCOM Import/Export	4	Gramps-Kompatibilität, Datenschutz
+ 
+
+US-001  Backend-Grundstruktur & erweitertes DB-Schema
+E1 · Projekt-Setup
+FastAPI + SQLAlchemy aufsetzen. Alle Tabellen in der richtigen Reihenfolge (wegen FK-Abhängigkeiten) anlegen: places → files → sources → persons → events → citations → relationships → relationship_children.
+[Backend]  [Datenbank]  [Architektur]
+Code-Konzept:
+# Reihenfolge: places → files → sources → persons → events → citations → relationships
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
+
+US-002  Frontend Setup: React + Vite + Design System
+E1 · Projekt-Setup
+Vite + React + TypeScript. Globale CSS-Variablen für Farben und Typografie. Basis-Layout mit Sidebar-Navigation, React Router v6, TanStack Query.
+[Frontend]  [Architektur]
+Code-Konzept:
+npm create vite@latest stammbaum-ui -- --template react-ts
+npm install react-router-dom @tanstack/react-query @xyflow/react @dagrejs/dagre
+
+US-003  Person CRUD Backend
+E2 · Personen
+GET/POST/PUT/DELETE für Personen. is_living als Drei-Zustands-Flag (null=unbekannt, true=lebt, false=verstorben). birth_place_id als FK zur places-Tabelle. gramps_id für GEDCOM-Mapping.
+[Backend]
+Code-Konzept:
+class PersonCreate(BaseModel):
+    first_name: str; last_name: str
+    is_living: Optional[bool] = None
+    birth_place_id: Optional[str] = None
+    gramps_id: Optional[str] = None
+ 
+US-004  Personenformular im Frontend
+E2 · Personen
+Wiederverwendbares Formular für Create/Edit. Geburtsort-Autocomplete (Anbindung an places-API), is_living 3-Zustand-Toggle, Beschreibungsfeld (Markdown-fähig).
+[Frontend]
+Code-Konzept:
+// PersonForm.tsx — is_living Toggle:
+// [?] Unbekannt  [✓] Lebt  [✗] Verstorben
+// Geburtsort: <PlaceAutocomplete>
+
+US-005  Profilbild & Bildergalerie
+E2 · Personen
+Upload von Profilbild (rund dargestellt im Baum). Galerie weiterer Bilder in der Detailansicht. Separate person_images-Tabelle.
+[Frontend]  [Backend]
+Code-Konzept:
+POST /persons/{id}/images → person_images
+GET  /persons/{id}/images → Liste
+
+US-006  Events-Tabelle & Backend-Endpoints  ★ Aus Gramps-Analyse
+E3 · Ereignisse
+Gramps-Kernkonzept: Geburt, Tod, Taufe etc. sind eigenständige Entitäten mit Datum, Ort und Quelle — nicht nur Felder an der Person. Ermöglicht mehrere Ereignisse desselben Typs und flexible Datumsangaben.
+[Backend]  [Datenbank]
+Code-Konzept:
+class Event(Base):
+    __tablename__ = "events"
+    id, person_id, event_type  # birth|death|baptism|…
+    date_text: str   # "ca. 1920", "vor 1900", "15.04.1923"
+    date_sort: Date  # für chronologische Sortierung
+    place_id: str FK → places
+    description: str
+    is_private: bool
+ 
+US-007  Ereignis-Zeitleiste in der Personendetailansicht  ★ Aus Gramps-Analyse
+E3 · Ereignisse
+Alle Ereignisse einer Person als vertikale Timeline. Ereignistyp-Icon, flexibles Datum, Ort (verlinkt), Beschreibung. Inline hinzufügen und bearbeiten ohne Seitenwechsel.
+[Frontend]
+Code-Konzept:
+// Ereignis-Icons: ★ Geburt  † Tod  ✟ Taufe  ♥ Heirat  → Emigration
+
+US-008  Flexible Datumseingabe  ★ Aus Gramps-Analyse
+E3 · Ereignisse
+Datumseingabe erlaubt exakte, ungefähre, qualifizierte und Zeitraum-Datumsangaben. Backend speichert Rohtext (für Anzeige) und Sortierdatum (für chronologische Sortierung) getrennt.
+[Frontend]  [Backend]
+Code-Konzept:
+parse_flex_date("ca. 1920")  → {qualifier:"about",  sort:"1920-01-01"}
+parse_flex_date("vor 1900")  → {qualifier:"before", sort:"1899-12-31"}
+parse_flex_date("1920-1925") → {qualifier:"range",  sort:"1920-01-01"}
+
+US-009  Places-Tabelle & CRUD Endpoints  ★ Aus Gramps-Analyse
+E4 · Orte
+Gramps-Konzept: Orte als eigene Entitäten statt Strings. Verhindert Duplikate ('München' vs 'munich'), ermöglicht spätere Kartenansicht. Geo-Koordinaten für Phase 2 bereits im Schema.
+[Backend]  [Datenbank]
+Code-Konzept:
+GET /places?q=München  → Autocomplete-Suche
+class Place: id, name, full_name, latitude, longitude, gramps_id
+ 
+US-010  Orts-Autocomplete im Formular  ★ Aus Gramps-Analyse
+E4 · Orte
+Debounced Suche in der places-Tabelle beim Tippen. Nicht gefundener Ort kann inline angelegt werden. Verhindert Datenduplikate durch konsistente Ortsreferenzierung.
+[Frontend]
+Code-Konzept:
+useDebouncedCallback(async (q) => {
+    const res = await api.get(`/places?q=${q}`);
+    // + "Neuen Ort anlegen: [München]" als letzte Option
+}, 300)
+
+US-011  Beziehungen CRUD Backend
+E5 · Beziehungen
+Endpoints für alle Beziehungstypen: partner, ex, adoption, foster, unknown. Kinder werden an Beziehungen (nicht an Personen) gebunden — ermöglicht korrekte Patchworkfamilien-Abbildung.
+[Backend]
+Code-Konzept:
+POST /relationships  → Beziehung anlegen mit child_ids
+POST /relationships/{id}/children/{child_id}
+DELETE /relationships/{id}/children/{child_id}
+
+US-012  Beziehungsformular im Frontend
+E5 · Beziehungen
+Partner auswählen (Personensuche), Beziehungstyp, Zeitraum mit flexibler Datumseingabe, Kinder per Multi-Select zuordnen. Wiederverwendet PlaceAutocomplete und FlexDateInput.
+[Frontend]
+Code-Konzept:
+<PersonSearch> + <FlexDateInput> + <ChildPicker multiselect>
+ 
+US-013  GET /tree — Graph-Daten generieren
+E6 · Stammbaum
+Backend-Service aggregiert Personen, Beziehungen und Ereignisse in React-Flow-kompatible Nodes + Edges. Geburts-/Sterbejahr aus Events-Tabelle, nicht als Felder an Person.
+[Backend]
+Code-Konzept:
+def build_tree(db):
+    birth_map = {e.person_id: e for e in events if e.event_type=="birth"}
+    nodes = [{"id": p.id, "data": {"birth_year": birth_map.get(p.id)?.date_text}}]
+    edges = build_relationship_edges(rels) + build_child_edges(db)
+
+US-014  React Flow + dagre Auto-Layout
+E6 · Stammbaum
+ReactFlow-Canvas mit Custom Nodes, automatischem dagre-Layout (Generationen vertikal, Partner horizontal). Zoom, Pan, MiniMap, Controls.
+[Frontend]
+Code-Konzept:
+npm install @xyflow/react @dagrejs/dagre
+applyDagreLayout(data, { rankdir:"TB", ranksep:80, nodesep:40 })
+
+US-015  Custom PersonNode — visuell aufgewertet
+E6 · Stammbaum
+Rundes Profilbild (Initialen-Fallback), Name, Lebensdaten. Farb-Kodierung: lebend=grüner Rand, verstorben=grauer Rand. Privat-Icon bei is_private=true.
+[Frontend]
+Code-Konzept:
+// is_living=true  → border: 2px solid #1D9E75
+// is_living=false → border: 2px solid #888
+// is_living=null  → border: 1px solid #ccc
+ 
+US-016  Hover-Tooltip & Klick-Sidebar
+E6 · Stammbaum
+Hover über Node: Kurzinfo (Name, Lebensdaten, erste 100 Zeichen Beschreibung). Klick: Detailsidebar (rechts eingeblendet) mit Timeline, Beschreibung, Galerie, Bearbeitungsmodus.
+[Frontend]
+Code-Konzept:
+onNodeClick={(_, node) => setSelectedPersonId(node.id)}
+// PersonSidebar: position absolute, right:0, width:380px
+
+US-017  Kontextmenü: Schnellaktionen
+E6 · Stammbaum
+Rechtsklick auf Node öffnet Kontextmenü: + Partner hinzufügen, + Kind hinzufügen, + Ereignis hinzufügen. Öffnet jeweiliges Formular vorausgefüllt mit der gewählten Person.
+[Frontend]
+Code-Konzept:
+onNodeContextMenu={(e, node) => { e.preventDefault(); setMenu({...}); }}
+// Aktionen: navigate(`/relationships/new?p1=${id}`)
+
+US-018  Sources & Citations Backend  ★ Aus Gramps-Analyse
+E7 · Quellenangaben
+Gramps-Konzept (vereinfacht): Eine Quelle (Buch, Urkunde, URL) kann mehrere Ereignisse und Personen belegen. Citations verknüpfen Quelle mit konkreter Tatsache und geben Fundstelle und Vertrauensgrad an.
+[Backend]  [Datenbank]
+Code-Konzept:
+Source: id, title, author, date, url, file_id
+Citation: id, source_id, event_id?, person_id?, page, confidence(low|medium|high)
+ 
+US-019  Quellenangabe-UI in der Ereignis-Timeline  ★ Aus Gramps-Analyse
+E7 · Quellenangaben
+Jedes Ereignis kann eine Quelle bekommen. [Q]-Badge wenn Quelle vorhanden, Vertrauensgrad als Punkte-Indikator (●●● hoch). Quelle inline ansehen und zuweisen.
+[Frontend]
+Code-Konzept:
+[★ Geburt] [15.04.1923] [München]          [Q ●●●]
+Sterberegister München 1923, S.47
+
+US-020  GEDCOM 5.5.1 Parser  ★ Aus Gramps-Analyse
+E8 · GEDCOM Import/Export
+Python-basierter Parser für GEDCOM 5.5.1 (de-facto-Standard, kompatibel mit Gramps, Ancestry, MyHeritage). Erkennt INDI, FAM, PLAC, EVEN. Fehlertoleranter Import.
+[Backend]
+Code-Konzept:
+from gedcom.parser import Parser
+# Mapping: INDI → persons, FAM → relationships + children
+# BIRT/DEAT/MARR → events, PLAC → places (dedupliziert)
+
+US-021  GEDCOM Import-Endpoint & Mapping  ★ Aus Gramps-Analyse
+E8 · GEDCOM Import/Export
+POST /import/gedcom — Upload einer .ged-Datei. Parsed und mapped in eigene DB-Struktur. Duplikat-Erkennung via gramps_id. Reihenfolge: Orte → Personen → Ereignisse → Familien.
+[Backend]
+Code-Konzept:
+places_map = create_places(parsed["places"], db)
+persons_map = create_persons(parsed["persons"], places_map, db)
+create_events(parsed["events"], persons_map, places_map, db)
+create_relationships(parsed["families"], persons_map, db)
+ 
+US-022  GEDCOM Import-UI im Frontend  ★ Aus Gramps-Analyse
+E8 · GEDCOM Import/Export
+Drag & Drop Upload-Seite für .ged-Dateien. Preview-Modus zeigt Anzahl der gefundenen Datensätze bevor der Import bestätigt wird. Fortschrittsanzeige beim Import.
+[Frontend]
+Code-Konzept:
+// 1. Drag & Drop .ged  2. POST /import/gedcom/preview
+// "47 Personen, 18 Familien, 23 Orte gefunden"
+// 3. Bestätigen → POST /import/gedcom  4. → Tree-Ansicht
+
+US-023  GEDCOM Export mit Datenschutz  ★ Aus Gramps-Analyse
+E8 · GEDCOM Import/Export
+GET /export/gedcom — Exportiert als GEDCOM 5.5.1. Lebende Personen (is_living=true) werden automatisch anonymisiert (nur 'Living Person' ohne Daten). Kompatibel mit Gramps, Ancestry.
+[Backend]
+Code-Konzept:
+if person.is_living:
+    lines += ["0 @{id}@ INDI", "1 NAME Living /Person/"]
+    continue  # Keine weiteren Daten exportieren
+ 
+7. Implementierungsreihenfolge
+
+Die empfohlene Reihenfolge minimiert Blockerrisiken durch konsequente bottom-up Implementierung und stellt sicher, dass jede Phase eigenständig testbar ist.
+
+Phase	Stories	Ergebnis / Meilenstein
+Phase 1	US-001, US-002	Projekt läuft lokal, DB ist angelegt, API antwortet
+Phase 2	US-003, US-004, US-005, US-009, US-010	Personen und Orte vollständig verwalten, App nutzbar
+Phase 3	US-006, US-007, US-008	Ereignis-Timeline funktioniert, flexible Datumsangaben
+Phase 4	US-011, US-012	Beziehungen und Patchworkfamilien abbildbar
+Phase 5	US-013, US-014, US-015	Stammbaum wird grafisch angezeigt — Kern-MVP erreicht
+Phase 6	US-016, US-017	Detailansicht, Sidebar, Kontextmenü — UX vollständig
+Phase 7	US-018, US-019	Quellenangaben, Vertrauensgrade
+Phase 8	US-020, US-021, US-022, US-023	GEDCOM Import/Export — Gramps-kompatibel
+ 
+8. Technologiestack
+
+
+Backend	Frontend
+Python 3.11+
+Laufzeitumgebung
+FastAPI
+REST-API-Framework, automatische OpenAPI-Docs
+SQLAlchemy + SQLite
+ORM + Datenbank (Phase 2: PostgreSQL)
+Alembic
+Datenbankmigrationen
+python-gedcom2
+GEDCOM 5.5.1 Parser	React 18 + TypeScript
+UI-Framework + Typsicherheit
+@xyflow/react (React Flow)
+Interaktiver Graph-Stammbaum
+@dagrejs/dagre
+Automatisches Graph-Layout
+TanStack Query
+Server-State, Caching, Invalidierung
+React Router v6
+Client-seitiges Routing
+ 
+9. Erweiterungen Phase 2
+
+Nach Fertigstellung des MVP können folgende Erweiterungen priorisiert werden:
+
+Kartenansicht
+Alle Orte aus der places-Tabelle auf einer interaktiven Karte darstellen. Bereits vorbereitet durch latitude/longitude-Felder.
+Timeline-Ansicht
+Alle Ereignisse aller Personen chronologisch in einer horizontalen Timeline — als Alternative zum Graphen.
+Multi-User-Support
+Benutzerkonten, Rollen (Viewer/Editor/Owner), Einladungssystem. Datenbank-Migration von SQLite zu PostgreSQL.
+Alembic-Migrationen
+Ersetzen des startup-create_all durch versionierte Migrationen mit Rollback-Möglichkeit.
+GEDCOM 7.0 Import
+Unterstützung des neuen GEDCOM-7-Standards (2021), der Same-Sex-Beziehungen und erweiterte Ereignistypen unterstützt.
+Bildergalerie
+Mehrere Bilder pro Person mit Beschriftung, Datum, Personen-Tagging.
+Export: PDF-Bericht
+Klassischer Stammbaum-Ausdruck als PDF mit konfigurierbaren Generationenanzahlen.
+Versionshistorie
+Audit-Log aller Änderungen mit Undo-Funktion pro Entität.
+ 
+10. Design- und UX-Konzept
+
+10.1 Designprinzipien
+•	Minimal und fokussiert: Keine überladenen UI-Elemente, Inhalte stehen im Vordergrund
+•	Kontextsensitiv: Aktionen erscheinen dort, wo sie gebraucht werden (Kontextmenü, Inline-Edit)
+•	Progressive Disclosure: Komplexe Informationen erst auf Anfrage — Hover → Tooltip, Klick → Sidebar
+•	Mobile-freundlich: Responsive Layout, Touch-kompatible Interaktionen
+
+10.2 Farbkodierung im Stammbaum
+Element	Visuell	Bedeutung
+Knoten: lebend	Grüner Rand	is_living = true
+Knoten: verstorben	Grauer Rand	is_living = false
+Knoten: unbekannt	Neutral	is_living = null
+Kante: biologisch	Durchgezogen, grau	Standard-Elternschaft
+Kante: Adoption	Gestrichelt, bernstein	rel_type = adoption
+Kante: Pflege	Gestrichelt, koralle	rel_type = foster
+Kante: Partnerschaft	Durchgezogen, blau	rel_type = partner
+Kante: Ex-Partner	Gestrichelt, blau	rel_type = ex
+Privat-Icon	Schloss-Icon	is_private = true
+ 
+11. Zentrale Funktionen — Signaturen
+
+Die folgenden Funktionen bilden das Herzstück des Systems. Sie werden im Service Layer implementiert.
+
+build_tree(db) → dict
+
+Hauptfunktion des Tree Service. Transformiert alle relationalen Daten in eine React-Flow-kompatible Graph-Struktur. Aggregiert Ereignisse, Beziehungen und Kinder-Zuordnungen.
+def build_tree(db: Session) -> dict:
+    persons = db.query(Person).all()
+    events = db.query(Event).all()
+    relationships = db.query(Relationship).all()
+    birth_map = extract_event_map(events, "birth")
+    death_map = extract_event_map(events, "death")
+    nodes = [build_person_node(p, birth_map, death_map) for p in persons]
+    edges = build_relationship_edges(relationships)
+    edges += build_child_edges(db)
+    return {"nodes": nodes, "edges": edges}
+
+extract_event_map(events, type) → dict
+
+Erstellt eine schnelle Lookup-Struktur (person_id → Event) für einen bestimmten Ereignistyp. Wird beim Tree-Build für Geburts- und Sterbedaten verwendet.
+def extract_event_map(events: list[Event], type: str) -> dict[str, Event]:
+    return {e.person_id: e for e in events if e.event_type == type}
+
+parse_flex_date(input: str) → dict
+
+Analysiert benutzerfreundliche Datumseingaben und gibt strukturierte Daten zurück. Unterstützt exakte Daten, ungefähre Angaben (ca.), Qualifikatoren (vor/nach) und Zeiträume.
+def parse_flex_date(input: str) -> dict:
+    # "15.04.1923" → {qualifier:"exact",  sort:date(1923,4,15)}
+    # "ca. 1920"   → {qualifier:"about",  sort:date(1920,1,1)}
+    # "vor 1900"   → {qualifier:"before", sort:date(1899,12,31)}
+    # "1920-1925"  → {qualifier:"range",  sort:date(1920,1,1)}
+
+import_gedcom(file_bytes, db) → dict
+
+Orchestriert den GEDCOM-Import in der richtigen Reihenfolge (Orte → Personen → Ereignisse → Familien) und vermeidet FK-Verletzungen durch die Reihenfolge.
+def import_gedcom(file_bytes: bytes, db: Session) -> dict:
+    parsed = parse_gedcom_bytes(file_bytes)
+    places_map = create_places(parsed["places"], db)
+    persons_map = create_persons(parsed["persons"], places_map, db)
+    create_events(parsed["events"], persons_map, places_map, db)
+    create_relationships(parsed["families"], persons_map, db)
+    db.commit()
+    return {"imported_persons": len(persons_map)}
+
+searchPlaces(query: string) → Promise<Place[]>
+
+Frontend-Funktion für die Orts-Autocomplete-Suche. Debounced, um übermäßige API-Anfragen zu vermeiden.
+const searchPlaces = useDebouncedCallback(
+  async (q: string): Promise<Place[]> => {
+    if (q.length < 2) return [];
+    const res = await api.get(`/places?q=${encodeURIComponent(q)}`);
+    return res.data;
+  }, 300
+);
+
+ 
+12. Projektbewertung und Zusammenfassung
+
+Das Stammbaum-Projekt verbindet ein flexibles, graphbasiertes Datenmodell mit einer modernen Weboberfläche. Durch die sorgfältige Analyse von Gramps wurde das ursprüngliche Konzept in drei wesentlichen Punkten verbessert:
+
+Datenqualitat
+Ereignis-Modell + Orte als Entitäten verhindern Datenverlust und Duplikate	Kompatibilitat
+GEDCOM-Import öffnet die Nutzerbasis aller existierenden Genealogie-Tools	Datenschutz
+is_living-Flag schützt Daten lebender Personen beim Export automatisch
+
+Die Architektur stellt sicher, dass das System als MVP schnell umsetzbar ist und dabei langfristig skalierbar bleibt. Der gewählte Technologiestack ist deutlich moderner als klassische Genealogie-Tools und ermöglicht zukünftige Erweiterungen wie Multi-User-Support, Kartenansicht und erweiterte Visualisierungen ohne strukturelle Umbauten.
+
+

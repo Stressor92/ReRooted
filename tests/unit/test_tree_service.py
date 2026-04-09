@@ -42,7 +42,8 @@ def test_build_tree_returns_nodes_and_expected_edges(db_session) -> None:
     tree = build_tree(db_session)
 
     assert len(tree["nodes"]) == 3
-    assert len(tree["edges"]) == 2
+    # updated: child edges are emitted for both parents per graph contract
+    assert len(tree["edges"]) == 3
 
     parent_node = next(node for node in tree["nodes"] if node["id"] == parent.id)
     assert parent_node["data"]["birth_year"] == "1901"
@@ -51,6 +52,8 @@ def test_build_tree_returns_nodes_and_expected_edges(db_session) -> None:
     partner_edge = next(edge for edge in tree["edges"] if edge["type"] == "partner")
     assert partner_edge["data"]["rel_type"] == RelType.ADOPTION
 
-    child_edge = next(edge for edge in tree["edges"] if edge["type"] == "child")
-    assert child_edge["data"]["dashed"] is True
-    assert child_edge["target"] == child.id
+    child_edges = [edge for edge in tree["edges"] if edge["type"] == "child"]
+    assert len(child_edges) == 2
+    assert {edge["source"] for edge in child_edges} == {parent.id, partner.id}
+    assert {edge["target"] for edge in child_edges} == {child.id}
+    assert all(edge["data"]["dashed"] is True for edge in child_edges)

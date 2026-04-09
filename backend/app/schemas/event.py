@@ -1,40 +1,47 @@
+from __future__ import annotations
+
 from datetime import date
-from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.models.event import EventType
+from app.models import EventType
 
 
 class EventCreate(BaseModel):
     event_type: EventType
-    date_text: Optional[str] = None
-    place_id: Optional[str] = None
-    description: Optional[str] = None
+    date_text: str | None = None
+    place_id: str | None = None
+    description: str | None = None
     is_private: bool = False
 
     @field_validator("date_text")
     @classmethod
-    def strip_date(cls, value: Optional[str]) -> Optional[str]:
-        return value.strip() if value else value
+    def strip_date(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
 
 
 class EventUpdate(BaseModel):
-    event_type: Optional[EventType] = None
-    date_text: Optional[str] = None
-    place_id: Optional[str] = None
-    description: Optional[str] = None
-    is_private: Optional[bool] = None
+    event_type: EventType | None = None
+    date_text: str | None = None
+    place_id: str | None = None
+    description: str | None = None
+    is_private: bool | None = None
+
+    @field_validator("date_text")
+    @classmethod
+    def strip_date(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
 
 
 class EventOut(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
     id: str
     person_id: str
     event_type: EventType
-    date_text: Optional[str]
-    date_sort: Optional[date]
-    place_id: Optional[str]
-    description: Optional[str]
+    date_text: str | None = None
+    date_sort: date | None = None
+    place_id: str | None = None
+    place_name: str | None = None
+    description: str | None = None
     is_private: bool

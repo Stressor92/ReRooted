@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import uuid
 
@@ -42,3 +44,9 @@ class Citation(Base):
     source = relationship("Source", back_populates="citations")
     person = relationship("Person")
     event = relationship("Event", back_populates="citations")
+
+    @property
+    def source_title(self) -> str | None:
+        if self.source is None or self.source.title is None:
+            return None
+        return str(self.source.title)

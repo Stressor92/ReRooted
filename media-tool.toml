@@ -1,0 +1,18 @@
+# ReRooted configuration reference
+#
+# This file is a human-readable reference for the current project settings.
+# The running backend currently reads the same values from environment variables
+# / `.env` via `backend/app/core/config.py` and `pydantic-settings`.
+
+app_name = "ReRooted"
+app_version = "0.1.0"
+debug = false
+
+database_url = "sqlite:///./rerooted.db"
+upload_dir = "./uploads"
+max_upload_size_mb = 20
+
+cors_origins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+]

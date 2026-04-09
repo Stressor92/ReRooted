@@ -1,22 +1,26 @@
-from typing import Optional
+from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class PlaceCreate(BaseModel):
     name: str
-    full_name: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    gramps_id: Optional[str] = None
+    full_name: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    gramps_id: str | None = None
+
+    @field_validator("name", "full_name")
+    @classmethod
+    def strip_strings(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
 
 
 class PlaceOut(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
     id: str
     name: str
-    full_name: Optional[str]
-    latitude: Optional[float]
-    longitude: Optional[float]
-    gramps_id: Optional[str]
+    full_name: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None

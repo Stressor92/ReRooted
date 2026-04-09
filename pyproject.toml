@@ -3,30 +3,14 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rerooted"
+name = "rerooted-workspace"
 version = "0.1.0"
-description = "Moderne webbasierte Genealogie-Anwendung mit FastAPI und interaktiver Stammbaum-Visualisierung."
+description = "Repository-level tooling and QA configuration for the ReRooted genealogy workspace."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "ReRooted" }]
 keywords = ["genealogy", "family-tree", "fastapi", "gedcom"]
-dependencies = [
-    "fastapi>=0.115,<1.0",
-    "uvicorn[standard]>=0.30,<1.0",
-    "sqlalchemy>=2.0,<3.0",
-    "pydantic>=2.7,<3.0",
-    "pydantic-settings>=2.2,<3.0",
-    "python-multipart>=0.0.9,<1.0",
-    "alembic>=1.13,<2.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0,<9.0",
-    "httpx>=0.27,<1.0",
-    "ruff>=0.6,<1.0",
-]
 
 [tool.setuptools.packages.find]
 where = ["backend"]
