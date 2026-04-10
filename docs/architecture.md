@@ -2,220 +2,248 @@
 
 ## Scope
 
-This document describes the **current implementation** of ReRooted as it exists in the repository:
+This document describes the **implemented architecture** in the current repository snapshot, with emphasis on the now-functional web frontend under `frontend/src/` and its contract boundary to the FastAPI backend.
 
-- backend runtime under `backend/app/`
-- database migrations under `backend/migrations/`
-- frontend scaffold under `frontend/src/`
-- automated tests under `tests/`
+It is intentionally **developer-facing** and documents:
 
-It is **developer-facing documentation**. It intentionally focuses on internal structure, runtime behavior, and extension boundaries rather than end-user instructions.
+- runtime structure
+- layer boundaries
+- cross-layer data flow
+- non-obvious design constraints
+- extension and debugging considerations
 
----
+For subsystem-level detail, see:
 
-## System Overview
-
-ReRooted is a **web-based genealogy system** built around a FastAPI backend and a scaffolded TypeScript frontend.
-
-The backend owns:
-
-- persistence (`SQLite` via `SQLAlchemy`)
-- API contracts (`FastAPI` + `Pydantic`)
-- family graph generation for React Flow (`/tree`)
-- media upload and thumbnail generation
-- GEDCOM preview/import/export workflows
-
-The frontend currently acts as a **typed integration scaffold**. It contains API hooks, feature boundaries, and design tokens, but the page and component implementations are still largely placeholders.
+- `docs/frontend/app.md`
+- `docs/frontend/tree-canvas.md`
+- `docs/frontend/person-panel.md`
+- `docs/design-decisions/frontend-state-management.md`
+- `docs/design-decisions/frontend-visualization.md`
 
 ---
 
-## Runtime Topology
+## High-Level System Overview
+
+ReRooted is a browser-based genealogy system with a clear split between:
+
+1. **Frontend SPA** (`React` + `TypeScript` + `Vite`)
+   - renders the family graph with `@xyflow/react`
+   - manages local UI state, optimistic updates, theme selection, search, and export actions
+   - orchestrates document/photo uploads and person editing flows
+
+2. **Backend API** (`FastAPI` + `SQLAlchemy`)
+   - persists persons, events, relationships, citations, files, and places
+   - projects stored genealogy data into React Flow-compatible `nodes` + `edges`
+   - handles GEDCOM preview/import/export and file storage
+
+3. **Persistence + file storage**
+   - `SQLite` database (`rerooted.db` by default)
+   - uploaded media under `uploads/`
+   - schema evolution through Alembic revisions
+
+### Runtime Topology
 
 ```mermaid
-flowchart TD
-    Browser[Browser / Frontend UI]
-    Client[frontend/src/api/client.ts]
+flowchart LR
+    Browser[Browser UI\nReact + Vite SPA]
+    QueryState[React Query / Zustand\nfrontend state]
+    Client[Axios client\nfrontend/src/api/client.ts]
     API[FastAPI routers\nbackend/app/api]
-    Services[Service layer\nbackend/app/services]
-    ORM[SQLAlchemy ORM\nbackend/app/models]
-    DB[(SQLite\nrerooted.db)]
-    Uploads[(uploads/)]
-    Alembic[Alembic migrations\nbackend/migrations]
+    Services[Domain services\nbackend/app/services]
+    Models[SQLAlchemy models\nbackend/app/models]
+    DB[(SQLite)]
+    Files[(uploads/)]
 
-    Browser --> Client
+    Browser --> QueryState
+    QueryState --> Client
     Client --> API
     API --> Services
-    Services --> ORM
-    ORM --> DB
-    Services --> Uploads
-    Alembic --> DB
+    Services --> Models
+    Models --> DB
+    Services --> Files
 ```
-
----
-
-## Repository-Level Responsibilities
-
-| Path | Responsibility |
-|---|---|
-| `backend/app/main.py` | FastAPI application factory, middleware, exception handling, router registration |
-| `backend/app/core/` | configuration and DB engine/session setup |
-| `backend/app/models/` | SQLAlchemy ORM entities and enums |
-| `backend/app/schemas/` | Pydantic request/response contracts |
-| `backend/app/services/` | business logic, graph transformation, import/export workflows |
-| `backend/app/api/` | HTTP layer only; delegates to services |
-| `backend/migrations/` | Alembic revision history |
-| `frontend/src/` | frontend scaffold, API hooks, layout/page boundaries, design tokens |
-| `tests/` | unit, integration, and API contract tests |
-| `uploads/` | canonical media and thumbnail storage |
-| `rerooted.db` | canonical SQLite database file |
 
 ---
 
 ## Layer Separation
 
-The backend follows a conventional layered architecture.
+### Frontend Layers
 
-| Layer | Purpose | Can depend on | Must not depend on |
+| Layer | Primary files | Responsibility | Dependency boundary |
 |---|---|---|---|
-| `api/` | HTTP routing, dependency injection, status codes | `schemas`, `services`, `core.database` | direct SQL queries or ORM writes |
-| `services/` | business rules and orchestration | `models`, `schemas`, `utils`, `core.config` | FastAPI dependency injection primitives |
-| `schemas/` | validation and serialization | `models` enums/types, Pydantic | database access, service logic |
-| `models/` | persistence structure and relations | SQLAlchemy core/ORM | services, routers |
-| `core/` | configuration and DB bootstrap | stdlib, SQLAlchemy, Pydantic settings | feature-specific logic |
-| `utils/` | reusable helpers (`date_parser`) | stdlib | routers or DB session management |
+| App shell | `main.tsx`, `App.tsx`, `layouts/AppLayout.tsx` | provider composition, routing, top-level layout, global error containment | must not contain domain logic |
+| API contracts | `api/*.ts` | typed HTTP contracts and URL handling | must remain backend-aligned |
+| Query/mutation hooks | `hooks/*.ts` | server-state orchestration, optimistic updates, cache invalidation | should not render UI |
+| Feature modules | `features/tree/**`, `features/persons/**` | domain behavior and interaction flows | consume hooks/contracts, not raw `fetch` |
+| Shared UI components | `components/**` | reusable controls and dialogs | should stay presentation-focused where possible |
+| Theme system | `design/tokens.css`, `design/templates/**`, `hooks/useTemplate.ts` | runtime styling and background/template selection | styling concerns only |
 
-### Practical Dependency Rules
+### Backend Layers
 
-1. **Routers call services** and obtain `db: Session` through `Depends(get_db)`.
-2. **Services own all mutations** and lookups.
-3. **Schemas define contracts only**.
-4. **Models are the single source of persistence structure**.
-
----
-
-## Primary Data Flows
-
-### 1. Person + Event Mutation Flow
-
-```text
-HTTP request
-  -> Pydantic schema validation
-  -> service validation (person/place existence, etc.)
-  -> ORM object creation/update
-  -> commit + refresh
-  -> schema serialization back to JSON
-```
-
-Important behavior:
-
-- `event_service.create_event()` and `update_event()` derive `date_sort` from `date_text` using `parse_flex_date()`.
-- `person_service.get_by_id()` eagerly loads `birth_place`, `events`, and `images`, then sorts events in memory for stable output.
-
-### 2. Tree Graph Generation
-
-```text
-GET /tree
-  -> tree_service.build_tree(db)
-  -> load persons, birth/death events, relationships
-  -> derive node payloads
-  -> derive partner edges + child edges
-  -> return React Flow compatible graph structure
-```
-
-This is the core backend-to-frontend bridge for family visualization.
-
-### 3. File Upload Flow
-
-```text
-multipart upload
-  -> MIME type check
-  -> bounded read (size limit)
-  -> safe basename extraction
-  -> file write to uploads/
-  -> thumbnail generation
-  -> DB record commit
-  -> `/files/{id}` + `/files/{id}/thumb` URLs returned
-```
-
-### 4. GEDCOM Import/Export Flow
-
-```text
-GEDCOM upload
-  -> extension + size validation
-  -> parse bytes (library if available, regex fallback otherwise)
-  -> normalize persons/families/events/places
-  -> deduplicate places
-  -> upsert persons by gramps_id
-  -> create events and relationships
-  -> single commit
-```
-
-Export reverses the process and anonymizes living persons.
+| Layer | Primary files | Responsibility | Dependency boundary |
+|---|---|---|---|
+| HTTP/transport | `backend/app/api/**` | routing, status codes, dependency injection | delegates business logic |
+| Domain services | `backend/app/services/**` | validation, orchestration, graph projection, GEDCOM processing | no FastAPI-specific UI logic |
+| Schemas | `backend/app/schemas/**` | request/response validation and serialization | no DB I/O |
+| ORM models | `backend/app/models/**` | persistence shape and relationships | no service logic |
+| Infrastructure | `backend/app/core/**`, `backend/migrations/**` | config, DB sessions, schema migration | feature-agnostic |
 
 ---
 
-## Design Principles Visible in Code
+## Cross-Layer Data Flows
+
+### 1. Tree Visualization Flow
+
+```mermaid
+sequenceDiagram
+    participant UI as TreePage/TreeCanvas
+    participant Query as useTree()
+    participant API as GET /tree
+    participant Service as tree_service
+    participant DB as SQLite
+
+    UI->>Query: request tree data
+    Query->>API: GET /tree
+    API->>Service: build_tree(db)
+    Service->>DB: read persons/events/relationships
+    DB-->>Service: normalized records
+    Service-->>API: React Flow `nodes` + `edges`
+    API-->>Query: JSON payload
+    Query-->>UI: cached tree data
+    UI->>UI: Dagre layout + render
+```
+
+Key property: the backend owns the **semantic graph**, while the frontend owns **visual layout direction and viewport behavior**.
+
+### 2. Person Editing Flow
+
+```text
+Select person node
+  -> `usePerson(personId)` loads person detail
+  -> `PersonPanel` opens with tab state
+  -> `InfoTab` builds local draft from `PersonDetail`
+  -> debounce-based auto-save issues `PUT /persons/{id}` and event mutations
+  -> React Query invalidates `['person', id]`, `['tree']`, and related lists
+```
+
+Important detail: birth and death are represented as **events**, not dedicated scalar columns. The frontend therefore maps between UI fields and event records in `InfoTab`.
+
+### 3. Media and Document Flow
+
+```text
+Drop file in PhotosTab/DocumentsTab
+  -> upload to `/files/upload`
+  -> backend stores file + optional thumbnail
+  -> frontend attaches file via `/persons/{id}/images` or creates source + citation
+  -> affected queries invalidated
+  -> panel re-renders with canonical backend state
+```
+
+For documents, the citation may be linked either:
+
+- to a specific event (`/events/{event_id}/citations`), or
+- directly to the person (`/persons/{person_id}/citations`)
+
+which enables documents **without** an associated event.
+
+### 4. GEDCOM Flow
+
+```text
+ImportPage
+  -> upload `.ged` file
+  -> preview via `POST /import/gedcom/preview`
+  -> confirm import via `POST /import/gedcom`
+  -> tree/person queries invalidated
+```
+
+GEDCOM export remains a backend-owned blob download via `GET /export/gedcom`.
+
+### 5. Image Export Flow
+
+```text
+User opens photo export menu
+  -> frontend fetches supported formats from `GET /export/image-formats`
+  -> actual PNG/JPG/SVG rendering happens client-side with `html-to-image`
+  -> toolbar/header are filtered from the exported snapshot
+```
+
+The backend currently exposes **export metadata**, not server-side bitmap rendering.
+
+---
+
+## Design Principles in the Current Code
 
 ### Modularity
 
-Each domain concern has a dedicated service:
+The codebase is intentionally split by concern:
 
-- persons
-- events
-- places
-- relationships
-- sources/citations
-- files
-- GEDCOM
-- tree projection
+- tree rendering is isolated under `frontend/src/features/tree/`
+- person editing lives under `frontend/src/features/persons/`
+- API contracts and mutations are separated from UI components
+- backend services are domain-scoped (`person_service`, `relationship_service`, `source_service`, `tree_service`, etc.)
 
-This keeps feature logic locally coherent and avoids large monolithic routers.
+This reduces hidden coupling and makes feature work traceable to one domain area.
 
 ### Separation of Concerns
 
-The project separates:
+Clear examples in the current implementation:
 
-- **transport concerns** (`api/`)
-- **domain/pipeline concerns** (`services/`)
-- **storage concerns** (`models/`, `core/database.py`)
-- **serialization concerns** (`schemas/`)
+- `frontend/src/api/client.ts` owns API base URL and error logging
+- `frontend/src/hooks/usePersonMutations.ts` owns invalidation strategy
+- `frontend/src/features/tree/useLayout.ts` owns only layout heuristics
+- `backend/app/services/tree_service.py` owns graph projection for the frontend
 
 ### Batch Safety
 
-The import pipeline is designed to reduce partial writes:
+Batch safety appears in places where partial state would be especially harmful:
 
-- GEDCOM import performs parsing and object creation first, then commits once at the end.
-- file upload services clean up written files if the database write fails.
+- GEDCOM import performs structured processing before committing the final result
+- file handling is encapsulated in service functions rather than scattered across routes
+- the frontend re-fetches canonical backend data after optimistic operations to converge on a stable state
 
 ### Idempotency
 
-Two important idempotent behaviors are present:
+Examples of idempotent or idempotency-friendly behavior already present:
 
-1. `place_service.get_or_create()` deduplicates places case-insensitively.
-2. `gedcom_service._create_persons()` upserts persons by `gramps_id`, allowing safe re-import of the same GEDCOM dataset without creating duplicate persons.
-
----
-
-## Current Boundaries and Limitations
-
-These are **current implementation facts**, not future promises.
-
-- The backend is functionally richer than the frontend at this stage.
-- The frontend pages and components mostly return `null`; they define structure and type boundaries but not full UI behavior yet.
-- SQLite is the only configured persistence backend.
-- Authentication, authorization, background jobs, and caching are **not implemented in the current codebase**.
-- Placeholder routers exist for `imports` and `exports`, but the active import/export behavior is currently implemented through GEDCOM-specific endpoints.
+- repeated GEDCOM imports can match persons by `gramps_id`
+- place normalization reduces accidental duplication during import
+- React Query invalidation ensures stale optimistic state is reconciled with the backend after writes
 
 ---
 
-## Extension Guidance
+## Dependency Boundaries Worth Preserving
 
-Developers extending the system should preserve these boundaries:
+When extending the system, keep these constraints intact:
 
-- add new business behavior in `backend/app/services/`
-- expose it via thin routers in `backend/app/api/`
-- keep response contracts explicit in `backend/app/schemas/`
-- use Alembic for schema evolution
-- keep runtime artifacts anchored to the repo-root `rerooted.db` and `uploads/`
+1. **Frontend components should call hooks or typed API helpers, not raw ad hoc network code.**
+2. **Frontend feature modules should not embed persistence assumptions** beyond documented contracts.
+3. **Routers remain thin** and should continue delegating logic to services.
+4. **The backend returns semantic genealogy structures; the frontend chooses visual layout strategy.**
+5. **Image export remains client-side** unless a future server-rendered export pipeline is explicitly introduced.
 
-This preserves the current architecture and minimizes hidden coupling.
+---
+
+## Current Architectural Constraints
+
+These are implementation facts, not roadmap promises:
+
+- the browser currently loads and renders the full tree in memory; there is no pagination or viewport-based virtualization
+- authentication and multi-user concurrency control are not present
+- the routed frontend surface is intentionally small: `/` for the tree workspace and `/import` for GEDCOM import
+- `frontend/src/pages/PersonsPage.tsx` exists as a code artifact but is not part of the active route map
+
+---
+
+## Debugging Orientation
+
+When diagnosing frontend/backend integration issues, start with the following boundaries:
+
+| Symptom | Most likely boundary |
+|---|---|
+| blank or oddly framed tree | `TreeCanvas.tsx`, `useLayout.ts`, React Flow viewport fitting |
+| missing person updates after edit | React Query invalidation in `usePersonMutations.ts` |
+| broken document/photo attachment | `/files/upload`, citation routes, tab-specific query mapping |
+| wrong export output | `useCanvasExport.ts` and export menu filtering |
+| theme/background inconsistencies | `useTemplate.ts` + `design/templates/types.ts` |
+
+This division mirrors the actual code ownership model and is the fastest route to root cause analysis.

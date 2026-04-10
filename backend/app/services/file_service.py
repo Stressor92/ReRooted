@@ -9,7 +9,8 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import File as StoredFile, PersonImage, Source
+from app.models import File as StoredFile
+from app.models import PersonImage, Source
 
 
 def _not_found(file_id: str) -> HTTPException:

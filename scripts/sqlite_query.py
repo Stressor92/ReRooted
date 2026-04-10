@@ -6,7 +6,6 @@ import os
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Any
 from urllib.parse import unquote, urlparse
 
 
@@ -34,9 +33,12 @@ def resolve_db_path() -> Path:
 def run_query(sql: str, *, as_json: bool) -> int:
     db_path = resolve_db_path()
     if not db_path.exists():
+        migration_command = (
+            "Push-Location backend; "
+            "..\\.venv\\Scripts\\python.exe -m alembic -c .\\alembic.ini upgrade head"
+        )
         raise SystemExit(
-            f"Database not found: {db_path}\n"
-            "Create it first with: Push-Location backend; ..\\.venv\\Scripts\\python.exe -m alembic -c .\\alembic.ini upgrade head"
+            f"Database not found: {db_path}\nCreate it first with: {migration_command}"
         )
 
     connection = sqlite3.connect(db_path)
@@ -75,8 +77,12 @@ def run_query(sql: str, *, as_json: bool) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run ad-hoc SQL queries against the local ReRooted SQLite database.")
-    parser.add_argument("sql", help="SQL statement to execute, e.g. SELECT id, first_name FROM persons LIMIT 5")
+    parser = argparse.ArgumentParser(
+        description="Run ad-hoc SQL queries against the local ReRooted SQLite database."
+    )
+    parser.add_argument(
+        "sql", help="SQL statement to execute, e.g. SELECT id, first_name FROM persons LIMIT 5"
+    )
     parser.add_argument("--json", action="store_true", help="Print rows as JSON")
     return parser
 

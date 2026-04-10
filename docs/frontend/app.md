@@ -1,243 +1,249 @@
-# Frontend Architecture (Current Scaffold)
+# Frontend Application Architecture
 
-## Scope and Status
+## Scope
 
-The frontend is currently a **structural scaffold** rather than a finished application. This document describes what is actually present in `frontend/src/` and how it is intended to connect to the backend.
+This document describes the **implemented** frontend runtime under `frontend/src/`. It is intended for developers who need to understand how the tree workspace, person panel, import page, data hooks, and design system interact internally.
 
-Where behavior is not implemented yet, it is marked as **implementation-dependent**.
+This is **not** end-user documentation.
 
 ---
 
-## Current Frontend Topology
+## Runtime Composition
 
-| Path | Current role |
+### Bootstrap Path
+
+```text
+main.tsx
+  -> imports global CSS + React Flow styles + react-pdf styles
+  -> mounts <App /> with React.StrictMode
+
+App.tsx
+  -> QueryClientProvider
+  -> BrowserRouter
+  -> ErrorBoundary
+  -> AppLayout
+  -> Routes
+  -> ToastContainer
+```
+
+### Provider / Routing Graph
+
+```mermaid
+flowchart TD
+    Main[main.tsx]
+    App[App.tsx]
+    Query[QueryClientProvider]
+    Router[BrowserRouter]
+    ErrorBoundary[ErrorBoundary]
+    Layout[AppLayout]
+    TreeRoute[/ route]
+    ImportRoute[/import route]
+    Toasts[ToastContainer]
+
+    Main --> App --> Query --> Router --> ErrorBoundary --> Layout
+    Layout --> TreeRoute
+    Layout --> ImportRoute
+    ErrorBoundary --> Toasts
+```
+
+### Active Routes
+
+| Route | Component | Purpose |
+|---|---|---|
+| `/` | `features/tree/TreePage.tsx` | main genealogy workspace |
+| `/import` | `pages/ImportPage.tsx` | GEDCOM preview/import flow |
+
+`frontend/src/pages/PersonsPage.tsx` exists in the codebase but is not part of the active route graph.
+
+---
+
+## Frontend Module Map
+
+| Path | Responsibility |
 |---|---|
-| `frontend/src/main.tsx` | bootstrap stub |
-| `frontend/src/App.tsx` | root component stub |
-| `frontend/src/api/client.ts` | fetch wrapper for backend requests |
-| `frontend/src/hooks/usePersons.ts` | query-definition hook for `/persons` |
-| `frontend/src/hooks/useTree.ts` | query-definition hook for `/tree` |
-| `frontend/src/layouts/AppLayout.tsx` | layout boundary stub |
-| `frontend/src/pages/` | page-level route boundaries (currently `null` components) |
-| `frontend/src/features/` | domain-oriented component boundaries |
-| `frontend/src/components/` | reusable typed UI building blocks |
-| `frontend/src/design/tokens.css` | design tokens / CSS custom properties |
+| `api/` | typed API contracts and the shared Axios client |
+| `hooks/` | React Query hooks, mutations, export helpers, keyboard shortcuts, template state |
+| `features/tree/` | React Flow canvas, layout, nodes, edges, search, context interactions |
+| `features/persons/` | panel header, tabs, quick-add, relationship dialogs |
+| `components/` | reusable controls (`CanvasToolbar`, `ConfirmDialog`, `Lightbox`, `Toast`, `PlaceAutocomplete`, etc.) |
+| `design/templates/` | runtime-selectable theme definitions |
+| `design/tokens.css` | CSS variable contract and component styling |
+| `layouts/AppLayout.tsx` | fixed header and root content shell |
 
 ---
 
-## Bootstrap Layer
+## State Management Model
 
-### `main.tsx`
+The frontend deliberately uses **three different state scopes**, each with a distinct ownership model.
 
-The current entry point only logs a startup message:
+### 1. Server State — React Query
 
-```ts
-function bootstrap(): void {
-  console.info("ReRooted frontend scaffold initialised.");
-}
-```
+React Query owns backend-backed data and mutation invalidation.
 
-There is currently:
+| Query key | Source | Typical consumer | Notes |
+|---|---|---|---|
+| `['tree']` | `GET /tree` | `TreePage`, `TreeCanvas` | stale time `10s`; central graph payload |
+| `['persons']` | `GET /persons` | search, lookups, relation summaries | reused across multiple flows |
+| `['person', personId]` | `GET /persons/{id}` | `PersonPanel` | drives all tab content |
+| `['person-citations', personId]` | citation routes | sources/documents flows | invalidated on create/update |
+| `['person-documents', personId]` | sources + citations | `DocumentsTab` | derived document view |
+| `['image-export-formats']` | `GET /export/image-formats` | `useCanvasExport()` | metadata only; actual rendering stays client-side |
 
-- no DOM mounting logic
-- no router setup
-- no React Query provider
-- no global state provider
+Mutation hooks such as `useUpdatePerson`, `useCreateRelationship`, `useUploadPersonImage`, and `useCreateSourceCitation` perform invalidation explicitly after successful writes.
 
-This means the frontend folder currently documents **planned module boundaries** more than active browser behavior.
+### 2. UI-Scoped Global State — Zustand
 
----
+Two lightweight stores handle UI concerns that do not belong in server state:
 
-## API Access Layer
+| Store | File | Responsibility |
+|---|---|---|
+| `useToastStore()` | `hooks/useToast.ts` | toast queue, auto-dismiss timing, success/error notifications |
+| `useTemplate()` | `hooks/useTemplate.ts` | active design template and selected background pattern |
 
-`frontend/src/api/client.ts` provides a minimal typed wrapper:
+This keeps UI-global state out of React Query while avoiding prop drilling through the tree workspace.
 
-- base URL is hardcoded to `http://localhost:8000`
-- default `Content-Type` is JSON
-- non-2xx responses throw a generic `Error`
+### 3. Local Component State
 
-### Current implications
+Transient interaction state remains local to the owning component, e.g.:
 
-- all frontend network calls are expected to go through a single adapter function
-- backend error bodies are not yet decoded into richer client-side error types
-- multipart flows will require call-site header control because uploads must not force JSON encoding
+- selected node and panel tab in `TreePage`
+- mobile toolbar / help modal state in `CanvasToolbar`
+- draft and auto-save state in `InfoTab`
+- PDF preview expansion state in `DocumentsTab`
+- dialog mode and relationship form data in `RelationshipDialog`
 
----
-
-## Data Hooks
-
-### `usePersons()`
-
-Returns a React Query-style object:
-
-- `queryKey: ["persons"]`
-- `queryFn: () => apiRequest("/persons")`
-
-### `useTree()`
-
-Returns a React Query-style object for the tree graph:
-
-- `queryKey: ["tree"]`
-- `queryFn: () => apiRequest("/tree")`
-
-These hooks do not themselves call `useQuery()` yet. They are contract helpers for whichever query composition pattern the final app adopts.
+This division is one of the key architectural choices of the frontend.
 
 ---
 
-## Page Boundaries
+## API Client and Contracts
 
-Current pages:
+### Shared Axios Client
 
-- `TreePage.tsx`
-- `PersonsPage.tsx`
-- `ImportPage.tsx`
+`frontend/src/api/client.ts` provides the boundary to the backend:
 
-All currently return `null`.
+- derives default base URL from `VITE_API_URL` or `window.location.hostname:8000`
+- sets JSON headers by default
+- logs failed requests with method, URL, status, and payload
+- exposes `getApiErrorMessage()` to normalize Axios error text for UI toasts
 
-### Interpretation
+### Contract Style
 
-The repository already expresses the intended navigation surface:
+The frontend keeps API contracts in dedicated modules rather than embedding inline types everywhere:
 
-- a tree visualization view
-- a person management view
-- an import/export view
+- `api/tree.ts` for `TreeData`, `TreeNode`, `TreeEdge`, `PersonNodeData`, `EdgeData`
+- `api/persons.ts` for `PersonSummary`, `PersonDetail`, `PersonEvent`, `PersonImage`
+- `api/files.ts` for upload/download helpers
 
-The concrete routing setup is **implementation-dependent** because no router is wired yet.
-
----
-
-## Feature Modules
-
-The `features/` directory encodes the intended domain split.
-
-### Tree feature
-
-Files:
-
-- `features/tree/TreeView.tsx`
-- `features/tree/PersonNode.tsx`
-- `features/tree/FamilyEdge.tsx`
-
-Currently exported types indicate the expected rendering inputs:
-
-- `TreeGraph` contains `nodes` and `edges`
-- `PersonNodeData` includes `first_name`, `last_name`, `birth_year`, `death_year`
-
-This matches the backend’s `/tree` response contract.
-
-### Persons feature
-
-Files:
-
-- `features/persons/PersonForm.tsx`
-- `features/persons/PersonSidebar.tsx`
-- `features/persons/EventTimeline.tsx`
-
-The present type exports show the intended editing boundary for person data (`first_name`, `last_name`, `description`).
+This keeps UI code close to semantic domain types instead of raw JSON blobs.
 
 ---
 
-## Reusable Components
+## Tree Workspace Composition
 
-### `FlexDateInput.tsx`
+The root route is assembled as follows:
 
-Defines the shape:
+1. `TreePage` requests `useTree()`.
+2. `toFlowNodes()` and `toFlowEdges()` adapt backend data to React Flow types.
+3. `applyDagreLayout()` computes visual positions in either `TB` or `LR` direction.
+4. `TreeCanvas` renders the interactive graph.
+5. Selecting a node opens `PersonPanel` with a currently active tab.
 
-```ts
-export type FlexDateValue = {
-  raw: string;
-  qualifier?: string | null;
-};
-```
+The tree workspace is therefore the primary integration surface between:
 
-This aligns conceptually with the backend’s `parse_flex_date()` utility, which turns raw genealogy-style dates into sortable metadata.
+- graph data from the backend
+- local viewport/layout state
+- inline creation and relationship editing flows
+- the right-side person editor
 
-### `PlaceAutocomplete.tsx`
-
-Defines the option shape:
-
-```ts
-export type PlaceOption = {
-  id: string;
-  name: string;
-  full_name?: string | null;
-};
-```
-
-This matches the current `/places` API output.
+For full subsystem detail, see `docs/frontend/tree-canvas.md`.
 
 ---
 
-## Design Tokens
+## Person Panel Composition
 
-`frontend/src/design/tokens.css` centralizes a small visual vocabulary:
+`PersonPanel` is mounted only when a `selectedPersonId` exists. Its internal structure is:
 
-- background and surface colors
-- primary and accent colors
-- muted text color
-- medium border radius
-- soft elevation shadow
-- global sans-serif font token
+- `PersonPanelHeader` for name/profile image actions and relative creation
+- Radix Tabs for `Info`, `Fotos`, `Dokumente`
+- `ConfirmDialog` for destructive delete flow
 
-This indicates an intention to keep visual styling tokenized rather than scattering ad hoc constants through components.
+The panel loads canonical data via `usePerson(personId)` and delegates tab-specific behavior to:
 
----
+- `tabs/InfoTab.tsx`
+- `tabs/PhotosTab.tsx`
+- `tabs/DocumentsTab.tsx`
 
-## Backend Contracts the Frontend Already Depends On
-
-Even though the UI is still skeletal, the existing hooks and types reveal several hard dependencies:
-
-### `/persons`
-
-Expected by `usePersons()` for list retrieval.
-
-### `/tree`
-
-Expected by `useTree()` and `TreeGraph` typing.
-
-### `/places`
-
-Implied by `PlaceAutocomplete` typing and backend autocomplete support.
-
-### Flexible dates
-
-Implied by `FlexDateInput` and the backend `date_text`/`date_sort` dual representation.
+For detailed tab behavior and synchronization rules, see `docs/frontend/person-panel.md`.
 
 ---
 
-## Integration Notes for Future Implementation
+## Error Handling and Recovery Behavior
 
-The current codebase suggests the following intended extension points:
+### Global Error Handling
 
-| Concern | Likely file boundary |
-|---|---|
-| page composition | `pages/*.tsx` |
-| shared layout and navigation shell | `layouts/AppLayout.tsx` |
-| API state integration | `hooks/` |
-| graph rendering | `features/tree/` |
-| form composition | `features/persons/` + `components/` |
-| visual consistency | `design/tokens.css` |
+`components/ErrorBoundary.tsx` protects the routed app shell and displays a recovery UI when rendering fails.
 
-These are architectural boundaries already encoded in the repo, even though the rendering logic is not yet implemented.
+### Tree-Specific Error Handling
+
+`features/tree/TreePage.tsx` wraps the canvas in a dedicated class-based `TreeErrorBoundary`. This isolates React Flow rendering issues from the rest of the app shell.
+
+### Request-Level Failures
+
+Mutation hooks convert backend failures into toasts using `getApiErrorMessage()`. This creates a consistent error surface without every component implementing its own Axios parsing.
+
+---
+
+## Styling and Theming Model
+
+The design system is runtime-driven through CSS custom properties set by `applyTemplate()` in `design/templates/types.ts`.
+
+Each template defines:
+
+- canvas background and dot color
+- node background, border, shadow, and typography colors
+- panel background/border
+- accent color and font family
+
+The actual UI therefore depends on **theme tokens**, not on hard-coded component colors.
+
+This allows `TemplatePicker` and `BackgroundPicker` to change the canvas appearance without re-mounting the tree or changing component logic.
+
+---
+
+## Extension Guidance
+
+When extending the frontend, prefer the following rules:
+
+1. **Add or update typed contracts in `api/` first** when backend payloads change.
+2. **Put backend-backed behavior into hooks**, not directly into UI components.
+3. **Keep feature-specific logic inside `features/tree/` or `features/persons/`**.
+4. **Use toasts for user-facing operation feedback** rather than silent failures.
+5. **Invalidate React Query caches explicitly** after writes; do not rely on implicit refresh.
+6. **Prefer CSS token updates over hard-coded per-component color changes**.
+
+---
+
+## Implementation-Dependent Areas
+
+A few areas should be documented cautiously because their behavior is intentionally narrow or incomplete:
+
+- image export rendering is client-side; the backend only publishes format metadata
+- the app is optimized for a single interactive workspace rather than multi-route CRUD screens
+- no explicit persistence of theme/background preferences to local storage is implemented in the current codebase
+- `PersonsPage.tsx` exists but is not part of the active navigation flow
 
 ---
 
 ## Summary
 
-The frontend is currently best understood as a **typed integration scaffold** for the backend rather than a complete application.
+The frontend is no longer a placeholder scaffold. It is a compact but fully working SPA with:
 
-What already exists:
+- a narrow route surface
+- a React Query + Zustand + local state split
+- a React Flow-based tree workspace
+- a right-side person editing system
+- runtime theming/background selection
+- client-side image export and server-backed GEDCOM import/export
 
-- a backend-oriented API client
-- query-definition hooks
-- page and feature boundaries
-- type hints for tree/person/date/place data
-- design tokens
-
-What remains implementation-dependent:
-
-- routing
-- actual React rendering
-- state provider setup
-- form behavior
-- graph visualization integration details
+Its architecture is intentionally feature-oriented and should remain so as the UI grows.

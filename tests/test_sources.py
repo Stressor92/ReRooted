@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
 
 def test_source_crud_and_event_citations(test_client) -> None:
     person_response = test_client.post(
@@ -81,6 +83,18 @@ def test_person_citation_can_exist_without_event(test_client) -> None:
     listed = list_response.json()
     assert len(listed) == 1
     assert listed[0]["id"] == citation["id"]
+
+
+def test_list_person_citations_missing_person_returns_not_found(test_client) -> None:
+    missing_person_id = str(uuid4())
+
+    response = test_client.get(f"/persons/{missing_person_id}/citations")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": "not_found",
+        "detail": f"Person {missing_person_id} not found",
+    }
 
 
 def test_deleting_source_cascades_event_citations(test_client) -> None:

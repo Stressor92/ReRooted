@@ -156,7 +156,10 @@ def add_image(
     if upload is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"error": "invalid_file", "detail": "Provide an image upload or existing file_id"},
+            detail={
+                "error": "invalid_file",
+                "detail": "Provide an image upload or existing file_id",
+            },
         )
 
     if upload.content_type is None or not upload.content_type.startswith("image/"):
@@ -215,9 +218,9 @@ def update_image(db: Session, person_id: str, image_id: str, data: PersonImageUp
     if is_profile is not None:
         if is_profile:
             for existing in person.images:
-                existing.is_profile = str(existing.id) == image_id
+                setattr(existing, "is_profile", str(existing.id) == image_id)
         else:
-            image.is_profile = False
+            setattr(image, "is_profile", False)
 
     db.commit()
     db.refresh(person)

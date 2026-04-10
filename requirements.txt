@@ -1,3 +1,4 @@
 # Convenience install for local development and CI.
-# Canonical runtime and dev dependencies live in `backend/pyproject.toml`.
+# Installs the FastAPI backend in editable mode including its dev dependencies.
+# Frontend dependencies are managed separately via `cd frontend && npm install`.
 -e ./backend[dev]

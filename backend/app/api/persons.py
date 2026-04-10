@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas.person import PersonCreate, PersonDetail, PersonImageUpdate, PersonOut, PersonUpdate
+from app.schemas.person import (
+    PersonCreate,
+    PersonDetail,
+    PersonImageUpdate,
+    PersonOut,
+    PersonUpdate,
+)
 from app.services import person_service
 
 router = APIRouter(tags=["persons"])

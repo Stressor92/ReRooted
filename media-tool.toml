@@ -1,18 +1,25 @@
 # ReRooted configuration reference
 #
-# This file is a human-readable reference for the current project settings.
-# The running backend currently reads the same values from environment variables
-# / `.env` via `backend/app/core/config.py` and `pydantic-settings`.
+# This file documents the default local-development settings of the project.
+# Runtime values are read from environment variables / `.env` in
+# `backend/app/core/config.py`.
 
 app_name = "ReRooted"
 app_version = "0.1.0"
 debug = false
 
+# SQLite database in the repository root
+# (default in `backend/app/core/config.py`).
 database_url = "sqlite:///./rerooted.db"
+
+# Local storage for uploaded images, documents and generated thumbnails.
 upload_dir = "./uploads"
 max_upload_size_mb = 20
 
+# Allowed frontend origins for local Vite/React development.
 cors_origins = [
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "http://localhost:3000",
+  "http://127.0.0.1:3000",
 ]
