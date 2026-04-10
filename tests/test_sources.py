@@ -51,6 +51,38 @@ def test_source_crud_and_event_citations(test_client) -> None:
     assert delete_source.status_code == 204
 
 
+def test_person_citation_can_exist_without_event(test_client) -> None:
+    person_response = test_client.post(
+        "/persons",
+        json={"first_name": "Person", "last_name": "Citation"},
+    )
+    assert person_response.status_code == 201
+    person_id = person_response.json()["id"]
+
+    source_response = test_client.post(
+        "/sources",
+        json={"title": "Family Letter", "author": "Private Archive"},
+    )
+    assert source_response.status_code == 201
+    source_id = source_response.json()["id"]
+
+    citation_response = test_client.post(
+        f"/persons/{person_id}/citations",
+        json={"source_id": source_id, "page": "Folder B", "confidence": "low"},
+    )
+    assert citation_response.status_code == 201
+    citation = citation_response.json()
+    assert citation["source_title"] == "Family Letter"
+    assert citation["person_id"] == person_id
+    assert citation["event_id"] is None
+
+    list_response = test_client.get(f"/persons/{person_id}/citations")
+    assert list_response.status_code == 200
+    listed = list_response.json()
+    assert len(listed) == 1
+    assert listed[0]["id"] == citation["id"]
+
+
 def test_deleting_source_cascades_event_citations(test_client) -> None:
     person_response = test_client.post(
         "/persons",

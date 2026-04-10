@@ -15,8 +15,8 @@ export default function TemplatePicker() {
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
-        <button type="button" className="rerooted-toolbar-button" title="Template auswählen">
-          Tmpl ●●●
+        <button type="button" className="rerooted-toolbar-button" title="Design auswählen">
+          Designs
         </button>
       </Popover.Trigger>
 

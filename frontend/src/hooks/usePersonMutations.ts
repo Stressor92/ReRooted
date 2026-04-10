@@ -5,7 +5,10 @@ import type { PersonEvent, PersonSummary } from '../api/persons';
 import { useToastStore } from './useToast';
 
 type PersonUpdatePayload = Partial<
-  Pick<PersonSummary, 'first_name' | 'last_name' | 'is_living' | 'birth_place_id' | 'description' | 'gramps_id'>
+  Pick<
+    PersonSummary,
+    'first_name' | 'last_name' | 'is_living' | 'birth_place_id' | 'description' | 'current_address' | 'phone_number' | 'gramps_id'
+  >
 > & {
   profile_image_id?: string | null;
 };
@@ -192,18 +195,19 @@ export function useCreateSourceCitation(personId: string) {
       source,
       citation,
     }: {
-      eventId: string;
+      eventId?: string | null;
       source: { title: string; author?: string | null; date?: string | null; url?: string | null; file_id?: string | null };
       citation: { page?: string | null; confidence?: 'low' | 'medium' | 'high' };
     }) => {
       const createdSource = await apiClient.post('/sources', source).then((r) => r.data);
+      const citationPayload = {
+        source_id: createdSource.id,
+        person_id: personId,
+        page: citation.page,
+        confidence: citation.confidence ?? 'medium',
+      };
       const createdCitation = await apiClient
-        .post(`/events/${eventId}/citations`, {
-          source_id: createdSource.id,
-          person_id: personId,
-          page: citation.page,
-          confidence: citation.confidence ?? 'medium',
-        })
+        .post(eventId ? `/events/${eventId}/citations` : `/persons/${personId}/citations`, citationPayload)
         .then((r) => r.data);
 
       return { source: createdSource, citation: createdCitation };

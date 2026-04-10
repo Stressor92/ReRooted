@@ -97,6 +97,19 @@ def get_citations_for_event(db: Session, event_id: str) -> list[Citation]:
     return list(db.scalars(stmt).all())
 
 
+def get_citations_for_person(db: Session, person_id: str) -> list[Citation]:
+    if db.get(Person, person_id) is None:
+        raise _not_found("Person", person_id)
+
+    stmt = (
+        select(Citation)
+        .options(joinedload(Citation.source))
+        .where(Citation.person_id == person_id)
+        .order_by(Citation.id.asc())
+    )
+    return list(db.scalars(stmt).all())
+
+
 def update_citation(db: Session, citation_id: str, data: CitationUpdate) -> Citation:
     citation = get_citation(db, citation_id)
     update_data = data.model_dump(exclude_unset=True)

@@ -47,12 +47,15 @@ class TreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
   }
 }
 
-function toFlowNodes(tree: TreeData): FlowNode[] {
+function toFlowNodes(tree: TreeData, layoutDir: 'TB' | 'LR'): FlowNode[] {
+  const sourcePosition = layoutDir === 'LR' ? Position.Right : Position.Bottom;
+  const targetPosition = layoutDir === 'LR' ? Position.Left : Position.Top;
+
   return tree.nodes.map((node) => ({
     ...node,
     draggable: false,
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
+    sourcePosition,
+    targetPosition,
   }));
 }
 
@@ -71,7 +74,7 @@ function TreePageContent() {
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [externalQuickAddState, setExternalQuickAddState] = useState<QuickAddState>(null);
 
-  const flowNodes = useMemo(() => (data ? toFlowNodes(data) : []), [data]);
+  const flowNodes = useMemo(() => (data ? toFlowNodes(data, layoutDir) : []), [data, layoutDir]);
   const flowEdges = useMemo(() => (data ? toFlowEdges(data) : []), [data]);
   const layoutedNodes = useMemo(
     () => applyDagreLayout(flowNodes, flowEdges, layoutDir) as FlowNode[],

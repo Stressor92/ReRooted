@@ -47,42 +47,33 @@ export default function DocumentsTab({ person }: DocumentsTabProps) {
   const createSourceCitation = useCreateSourceCitation(person.id);
   const deleteFile = useDeletePersonFile(person.id);
   const [category, setCategory] = useState('Sonstiges');
-  const [selectedEventId, setSelectedEventId] = useState(person.events[0]?.id ?? '');
+  const [selectedEventId, setSelectedEventId] = useState('');
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
   const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
 
   const { data: documents = [] } = useQuery<LinkedDocument[]>({
     queryKey: ['person-documents', person.id, person.events.map((event) => event.id).join(',')],
     queryFn: async () => {
-      const eventIds = person.events.map((event) => event.id);
-      if (eventIds.length === 0) {
-        return [];
-      }
-
-      const [sources, groupedCitations] = await Promise.all([
+      const [sources, citations] = await Promise.all([
         apiClient.get('/sources').then((r) => r.data as SourceRecord[]),
-        Promise.all(
-          person.events.map(async (event) => ({
-            event,
-            citations: await apiClient
-              .get(`/events/${event.id}/citations`)
-              .then((r) => r.data as CitationRecord[])
-              .catch(() => []),
-          })),
-        ),
+        apiClient
+          .get(`/persons/${person.id}/citations`)
+          .then((r) => r.data as CitationRecord[])
+          .catch(() => []),
       ]);
 
       const sourceMap = new Map(sources.map((source) => [source.id, source]));
-
-      return groupedCitations.flatMap(({ event, citations }) =>
-        citations
-          .map((citation) => ({
-            citation,
-            source: sourceMap.get(citation.source_id),
-            eventLabel: `${event.event_type}${event.date_text ? ` · ${event.date_text}` : ''}`,
-          }))
-          .filter((item): item is LinkedDocument => Boolean(item.source?.file_id)),
+      const eventMap = new Map(
+        person.events.map((event) => [event.id, `${event.event_type}${event.date_text ? ` · ${event.date_text}` : ''}`]),
       );
+
+      return citations
+        .map((citation) => ({
+          citation,
+          source: sourceMap.get(citation.source_id),
+          eventLabel: citation.event_id ? (eventMap.get(citation.event_id) ?? 'Ohne Ereignis') : 'Ohne Ereignis',
+        }))
+        .filter((item): item is LinkedDocument => Boolean(item.source?.file_id));
     },
     enabled: true,
     staleTime: 30_000,
@@ -90,10 +81,6 @@ export default function DocumentsTab({ person }: DocumentsTabProps) {
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
-      if (!selectedEventId) {
-        return;
-      }
-
       for (const file of acceptedFiles) {
         const uploaded = await apiClient
           .post('/files/upload', (() => {
@@ -128,7 +115,6 @@ export default function DocumentsTab({ person }: DocumentsTabProps) {
       'image/png': ['.png'],
     },
     maxSize: 50 * 1024 * 1024,
-    disabled: !selectedEventId,
   });
 
   const eventOptions = useMemo(
@@ -150,6 +136,8 @@ export default function DocumentsTab({ person }: DocumentsTabProps) {
             <select className="rerooted-input" value={category} onChange={(event) => setCategory(event.target.value)}>
               <option>Geburtsurkunde</option>
               <option>Heiratsurkunde</option>
+              <option>Zeugnisse</option>
+              <option>Briefe</option>
               <option>Testament</option>
               <option>Foto</option>
               <option>Sonstiges</option>
@@ -157,13 +145,13 @@ export default function DocumentsTab({ person }: DocumentsTabProps) {
           </label>
 
           <label className="rerooted-field">
-            <span>Ereignis</span>
+            <span>Ereignis (optional)</span>
             <select
               className="rerooted-input"
               value={selectedEventId}
               onChange={(event) => setSelectedEventId(event.target.value)}
             >
-              {eventOptions.length === 0 ? <option value="">Bitte zuerst ein Ereignis anlegen</option> : null}
+              <option value="">Kein Ereignis</option>
               {eventOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -173,10 +161,9 @@ export default function DocumentsTab({ person }: DocumentsTabProps) {
           </label>
         </div>
 
-        <div {...getRootProps()} className={`rerooted-dropzone${isDragActive ? ' is-drag-active' : ''}${!selectedEventId ? ' is-disabled' : ''}`}>
+        <div {...getRootProps()} className={`rerooted-dropzone${isDragActive ? ' is-drag-active' : ''}`}>
           <input {...getInputProps()} />
-          <strong>Dateien hier ablegen</strong>
-          <span>Vorschau für PDFs direkt im Panel.</span>
+          <strong>Datei hier ablegen</strong>
         </div>
       </section>
 

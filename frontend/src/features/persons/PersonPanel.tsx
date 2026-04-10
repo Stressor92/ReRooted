@@ -7,7 +7,6 @@ import { useDeletePerson } from '../../hooks/usePersonMutations';
 import DocumentsTab from './tabs/DocumentsTab';
 import InfoTab from './tabs/InfoTab';
 import PhotosTab from './tabs/PhotosTab';
-import SourcesTab from './tabs/SourcesTab';
 import type { QuickAddPreset } from './forms/QuickAddPopover';
 import PersonPanelHeader from './PersonPanelHeader';
 
@@ -28,7 +27,7 @@ const VARIANTS = {
   },
 } as const;
 
-export type PersonPanelTab = 'info' | 'photos' | 'documents' | 'sources';
+export type PersonPanelTab = 'info' | 'photos' | 'documents';
 
 type PersonPanelProps = {
   personId: string;
@@ -75,8 +74,6 @@ export default function PersonPanel({
         return <PhotosTab person={person} />;
       case 'documents':
         return <DocumentsTab person={person} />;
-      case 'sources':
-        return <SourcesTab person={person} />;
       case 'info':
       default:
         return <InfoTab person={person} />;
@@ -141,9 +138,6 @@ export default function PersonPanel({
                 </Tabs.Trigger>
                 <Tabs.Trigger className="rerooted-tab-trigger" value="documents">
                   Dokumente
-                </Tabs.Trigger>
-                <Tabs.Trigger className="rerooted-tab-trigger" value="sources">
-                  Quellen
                 </Tabs.Trigger>
               </Tabs.List>
 

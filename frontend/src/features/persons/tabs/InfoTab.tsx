@@ -16,6 +16,8 @@ type DraftState = {
   last_name: string;
   is_living: boolean | null;
   description: string;
+  current_address: string;
+  phone_number: string;
   birth_place_id: string | null;
   birth_place_name: string;
   birth_date_text: string;
@@ -53,6 +55,8 @@ function buildDraft(person: PersonDetail): DraftState {
     last_name: person.last_name,
     is_living: person.is_living,
     description: person.description ?? '',
+    current_address: person.current_address ?? '',
+    phone_number: person.phone_number ?? '',
     birth_place_id: (birthEvent?.place_id as string | null | undefined) ?? person.birth_place_id ?? null,
     birth_place_name: birthEvent?.place_name ?? person.birth_place?.full_name ?? person.birth_place?.name ?? '',
     birth_date_text: birthEvent?.date_text ?? '',
@@ -152,6 +156,12 @@ export default function InfoTab({ person }: InfoTabProps) {
     if ((draft.description || '') !== (person.description ?? '')) {
       personPayload.description = draft.description.trim() || null;
     }
+    if ((draft.current_address || '') !== (person.current_address ?? '')) {
+      personPayload.current_address = draft.current_address.trim() || null;
+    }
+    if ((draft.phone_number || '') !== (person.phone_number ?? '')) {
+      personPayload.phone_number = draft.phone_number.trim() || null;
+    }
     if ((draft.birth_place_id ?? null) !== (person.birth_place_id ?? null)) {
       personPayload.birth_place_id = draft.birth_place_id;
     }
@@ -228,6 +238,24 @@ export default function InfoTab({ person }: InfoTabProps) {
               className="rerooted-input"
               value={draft.last_name}
               onChange={(event) => setDraft((current) => ({ ...current, last_name: event.target.value }))}
+            />
+          </label>
+
+          <label className="rerooted-field">
+            <span>Aktuelle Adresse</span>
+            <input
+              className="rerooted-input"
+              value={draft.current_address}
+              onChange={(event) => setDraft((current) => ({ ...current, current_address: event.target.value }))}
+            />
+          </label>
+
+          <label className="rerooted-field">
+            <span>Telefonnr.</span>
+            <input
+              className="rerooted-input"
+              value={draft.phone_number}
+              onChange={(event) => setDraft((current) => ({ ...current, phone_number: event.target.value }))}
             />
           </label>
 

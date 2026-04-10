@@ -108,8 +108,7 @@ export default function PhotosTab({ person }: PhotosTabProps) {
 
         <div {...getRootProps()} className={`rerooted-dropzone${isDragActive ? ' is-drag-active' : ''}`}>
           <input {...getInputProps()} />
-          <strong>Fotos hier ablegen</strong>
-          <span>oder klicken, um neue Bilder hochzuladen.</span>
+          <strong>Fotos hier hochladen</strong>
         </div>
       </section>
 

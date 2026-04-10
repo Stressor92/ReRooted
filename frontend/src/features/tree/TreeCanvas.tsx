@@ -4,13 +4,15 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  useNodesInitialized,
+  useReactFlow,
   type Connection,
   type Edge,
   type Node,
   type NodeMouseHandler,
 } from '@xyflow/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, getApiErrorMessage } from '../../api/client';
 import type { CreatePersonResult } from '../../hooks/useCreatePerson';
@@ -67,6 +69,18 @@ type RelationshipRecord = {
   child_ids: string[];
 };
 
+type MiniMapPersonNodeProps = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color?: string;
+  strokeColor?: string;
+  selected?: boolean;
+  onClick?: (event: ReactMouseEvent<SVGGElement>, id: string) => void;
+};
+
 function relationshipTypeFromRelType(
   relType: RelationshipRecord['rel_type'],
   edgeType: FlowEdge['type'],
@@ -120,6 +134,10 @@ function getCenteredQuickAddPosition(): { x: number; y: number } {
   };
 }
 
+function getPersonInitials(firstName?: string | null, lastName?: string | null): string {
+  return `${firstName?.charAt(0) ?? ''}${lastName?.charAt(0) ?? ''}`.trim().toUpperCase() || '?';
+}
+
 function getRelationshipStateFromPreset(
   result: CreatePersonResult,
   preset?: QuickAddPreset,
@@ -166,6 +184,8 @@ export default function TreeCanvas({
   onSelectPerson,
 }: TreeCanvasProps) {
   const navigate = useNavigate();
+  const { fitView } = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const addChild = useAddChild();
@@ -174,6 +194,58 @@ export default function TreeCanvas({
   const [relationshipState, setRelationshipState] = useState<RelationshipDialogState>(null);
   const { menu, onNodeContextMenu, closeMenu } = useContextMenu();
   const { query, setQuery, matchedIds, activeMatchId, focusMatch, resultCount } = useCanvasSearch(nodes);
+  const fitViewOptions = useMemo(
+    () => ({
+      padding: 0.12,
+      minZoom: 0.6,
+      maxZoom: 1.05,
+      duration: 280,
+    }),
+    [],
+  );
+  const minimapInitials = useMemo(
+    () => new Map(nodes.map((node) => [node.id, getPersonInitials(node.data.first_name, node.data.last_name)])),
+    [nodes],
+  );
+  const MiniMapPersonNode = useCallback(
+    ({ id, x, y, width, height, color, strokeColor, selected, onClick }: MiniMapPersonNodeProps) => {
+      const initials = minimapInitials.get(id) ?? '?';
+      const cx = x + width / 2;
+      const cy = y + height / 2;
+      const radius = Math.max(42, Math.min(width, height) * 0.34);
+
+      return (
+        <g onClick={(event) => onClick?.(event, id)} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+          <circle
+            cx={cx}
+            cy={cy}
+            r={radius}
+            fill={selected ? 'var(--accent)' : (color ?? 'var(--accent)')}
+            stroke={selected ? 'var(--node-name-color)' : (strokeColor ?? 'var(--node-border)')}
+            strokeWidth={selected ? 8 : 6}
+            opacity={0.96}
+          />
+          <text
+            x={cx}
+            y={cy}
+            textAnchor="middle"
+            dominantBaseline="central"
+            style={{
+              fill: selected ? '#08110A' : 'var(--node-name-color)',
+              fontSize: Math.max(radius * 0.9, 34),
+              fontWeight: 800,
+              letterSpacing: '-0.04em',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          >
+            {initials}
+          </text>
+        </g>
+      );
+    },
+    [minimapInitials],
+  );
 
   const openQuickAdd = useCallback((state?: QuickAddState) => {
     setQuickAddState(
@@ -337,12 +409,33 @@ export default function TreeCanvas({
     [edges, handleEditRelationship],
   );
 
-  const backgroundVariant =
+  const backgroundConfig =
     backgroundType === 'lines'
-      ? BackgroundVariant.Lines
-      : backgroundType === 'cross'
-        ? BackgroundVariant.Cross
-        : BackgroundVariant.Dots;
+      ? { variant: BackgroundVariant.Lines, gap: 24, size: 1 }
+      : backgroundType === 'lines-dense'
+        ? { variant: BackgroundVariant.Lines, gap: 14, size: 1 }
+        : backgroundType === 'cross'
+          ? { variant: BackgroundVariant.Cross, gap: 28, size: 1 }
+          : backgroundType === 'dots-dense'
+            ? { variant: BackgroundVariant.Dots, gap: 12, size: 0.9 }
+            : backgroundType === 'dots-large'
+              ? { variant: BackgroundVariant.Dots, gap: 26, size: 1.8 }
+              : { variant: BackgroundVariant.Dots, gap: 18, size: 1.2 };
+
+  useEffect(() => {
+    if (!nodesInitialized || decoratedNodes.length === 0) {
+      return;
+    }
+
+    const handle = window.requestAnimationFrame(() => {
+      void fitView({
+        nodes: decoratedNodes,
+        ...fitViewOptions,
+      });
+    });
+
+    return () => window.cancelAnimationFrame(handle);
+  }, [decoratedNodes, fitView, fitViewOptions, nodesInitialized]);
 
   return (
     <div className={`rerooted-tree-shell${selectedPersonId ? ' is-panel-open' : ''}`}>
@@ -353,7 +446,8 @@ export default function TreeCanvas({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
-          minZoom={0.15}
+          fitViewOptions={fitViewOptions}
+          minZoom={0.2}
           maxZoom={1.5}
           onNodeClick={(_event, node) => onSelectPerson(node.id)}
           onNodeContextMenu={handleContextMenu}
@@ -365,24 +459,19 @@ export default function TreeCanvas({
             setQuickAddState(null);
             setRelationshipState(null);
           }}
-          style={{ background: 'var(--canvas-bg)', width: '100%', height: '100vh' }}
+          style={{ background: 'var(--canvas-bg)', width: '100%', height: 'calc(100vh - 16px)', minHeight: '560px' }}
           proOptions={{ hideAttribution: true }}
         >
           {backgroundType !== 'none' ? (
             <Background
               id="rerooted-bg"
-              variant={backgroundVariant}
-              gap={backgroundType === 'cross' ? 28 : backgroundType === 'lines' ? 24 : 18}
-              size={backgroundType === 'dots' ? 1.2 : 1}
+              variant={backgroundConfig.variant}
+              gap={backgroundConfig.gap}
+              size={backgroundConfig.size}
               color="var(--canvas-dot-color)"
             />
           ) : null}
           <Controls position="bottom-left" />
-          <MiniMap
-            position="bottom-right"
-            nodeColor={'var(--accent)'}
-            style={{ background: 'var(--node-bg)', border: '1px solid var(--node-border)' }}
-          />
           <CanvasToolbar
             layoutDir={layoutDir}
             query={query}

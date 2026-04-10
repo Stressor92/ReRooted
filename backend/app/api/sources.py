@@ -49,9 +49,27 @@ def add_event_citation(
     return source_service.add_citation(db, payload.source_id, event_id, payload.person_id, payload)
 
 
+@router.post(
+    "/persons/{person_id}/citations",
+    response_model=CitationOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_person_citation(
+    person_id: str,
+    payload: CitationCreate,
+    db: Annotated[Session, Depends(get_db)],
+):
+    return source_service.add_citation(db, payload.source_id, None, person_id, payload)
+
+
 @router.get("/events/{event_id}/citations", response_model=list[CitationOut])
 def list_event_citations(event_id: str, db: Annotated[Session, Depends(get_db)]):
     return source_service.get_citations_for_event(db, event_id)
+
+
+@router.get("/persons/{person_id}/citations", response_model=list[CitationOut])
+def list_person_citations(person_id: str, db: Annotated[Session, Depends(get_db)]):
+    return source_service.get_citations_for_person(db, person_id)
 
 
 @router.patch("/citations/{citation_id}", response_model=CitationOut)

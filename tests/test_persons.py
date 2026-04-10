@@ -20,6 +20,8 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
             "last_name": f"Zimmer{suffix}",
             "birth_place_id": place_id,
             "description": "Created by API test",
+            "current_address": "Musterstraße 12, Berlin",
+            "phone_number": "+49 30 123456",
             "is_living": True,
             "gramps_id": f"G-{suffix}",
         },
@@ -30,6 +32,8 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
     assert created["first_name"] == f"Anna{suffix}"
     assert created["last_name"] == f"Zimmer{suffix}"
     assert created["birth_place_id"] == place_id
+    assert created["current_address"] == "Musterstraße 12, Berlin"
+    assert created["phone_number"] == "+49 30 123456"
     assert created["profile_image_url"] is None
 
     person_id = created["id"]
@@ -47,12 +51,19 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
 
     update_response = test_client.put(
         f"/persons/{person_id}",
-        json={"last_name": f"Schmidt{suffix}", "description": "Updated description"},
+        json={
+            "last_name": f"Schmidt{suffix}",
+            "description": "Updated description",
+            "current_address": "Neue Anschrift 5, Hamburg",
+            "phone_number": "+49 40 987654",
+        },
     )
     assert update_response.status_code == 200
     updated = update_response.json()
     assert updated["last_name"] == f"Schmidt{suffix}"
     assert updated["description"] == "Updated description"
+    assert updated["current_address"] == "Neue Anschrift 5, Hamburg"
+    assert updated["phone_number"] == "+49 40 987654"
 
     delete_response = test_client.delete(f"/persons/{person_id}")
     assert delete_response.status_code == 204

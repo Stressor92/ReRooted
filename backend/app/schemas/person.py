@@ -12,6 +12,8 @@ class PersonCreate(BaseModel):
     is_living: bool | None = None
     birth_place_id: str | None = None
     description: str | None = None
+    current_address: str | None = None
+    phone_number: str | None = None
     gramps_id: str | None = None
 
 
@@ -21,6 +23,8 @@ class PersonUpdate(BaseModel):
     is_living: bool | None = None
     birth_place_id: str | None = None
     description: str | None = None
+    current_address: str | None = None
+    phone_number: str | None = None
     gramps_id: str | None = None
     profile_image_id: str | None = None
 
@@ -56,6 +60,8 @@ class PersonOut(BaseModel):
     is_living: bool | None = None
     birth_place_id: str | None = None
     description: str | None = None
+    current_address: str | None = None
+    phone_number: str | None = None
     gramps_id: str | None = None
     profile_image_url: str | None = None
 

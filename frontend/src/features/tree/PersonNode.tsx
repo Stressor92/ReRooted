@@ -42,7 +42,11 @@ function getStatusColor(isLiving: boolean | null): string {
   return 'var(--status-unknown)';
 }
 
-const PersonNode = memo(function PersonNode({ data }: NodeProps<PersonFlowNode>) {
+const PersonNode = memo(function PersonNode({
+  data,
+  sourcePosition = Position.Bottom,
+  targetPosition = Position.Top,
+}: NodeProps<PersonFlowNode>) {
   const zoom = useStore((store) => store.transform[2] ?? 1);
   const mode = getMode(zoom);
   const photoSize = mode === 'full' ? 80 : 64;
@@ -63,7 +67,7 @@ const PersonNode = memo(function PersonNode({ data }: NodeProps<PersonFlowNode>)
       transition={{ type: 'spring', stiffness: 230, damping: 18, mass: 0.7 }}
       title={label}
     >
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={targetPosition} />
       <span className="rerooted-status-dot" style={{ background: getStatusColor(data.is_living) }} />
 
       {data.profile_image_url ? (
@@ -90,7 +94,7 @@ const PersonNode = memo(function PersonNode({ data }: NodeProps<PersonFlowNode>)
         </div>
       ) : null}
 
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={sourcePosition} />
     </motion.div>
   );
 });

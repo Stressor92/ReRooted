@@ -2,12 +2,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReactFlow, useStore } from '@xyflow/react';
-import { useCanvasExport } from '../hooks/useCanvasExport';
 import { useGedcomExport } from '../hooks/useGedcom';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-import { useTemplate } from '../hooks/useTemplate';
-import type { BackgroundType } from '../design/templates/types';
 import CanvasSearch from './CanvasSearch';
+import BackgroundPicker from './BackgroundPicker';
+import ExportPicker from './ExportPicker';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 import TemplatePicker from './TemplatePicker';
 
@@ -36,13 +35,18 @@ export default function CanvasToolbar({
   const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow();
   const zoom = useStore((store) => store.transform[2] ?? 1);
   const gedcomExport = useGedcomExport();
-  const { exportAsPng } = useCanvasExport();
-  const backgroundType = useTemplate((state) => state.backgroundType);
-  const setBackgroundType = useTemplate((state) => state.setBackgroundType);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
   const zoomPercent = useMemo(() => `${Math.round(zoom * 100)}%`, [zoom]);
+
+  const handleFitCanvas = () =>
+    void fitView({
+      duration: 220,
+      padding: 0.24,
+      minZoom: 0.16,
+      maxZoom: 0.9,
+    });
 
   const focusSearch = () => {
     const input = document.querySelector<HTMLInputElement>('.rerooted-toolbar-search');
@@ -50,15 +54,8 @@ export default function CanvasToolbar({
     input?.select();
   };
 
-  const backgroundOptions: Array<{ value: BackgroundType; label: string; title: string }> = [
-    { value: 'dots', label: '•', title: 'Gepunktet' },
-    { value: 'lines', label: '≡', title: 'Liniert' },
-    { value: 'cross', label: '#', title: 'Kreuzraster' },
-    { value: 'none', label: '∅', title: 'Ohne Raster' },
-  ];
-
   useKeyboardShortcuts({
-    'ctrl+0': () => void fitView({ duration: 250, padding: 0.2 }),
+    'ctrl+0': handleFitCanvas,
     'ctrl++': () => void zoomIn({ duration: 150 }),
     'ctrl+=': () => void zoomIn({ duration: 150 }),
     'ctrl+-': () => void zoomOut({ duration: 150 }),
@@ -71,7 +68,10 @@ export default function CanvasToolbar({
         document.activeElement.blur();
       }
     },
-    '?': () => setHelpOpen(true),
+    '?': () => {
+      setMobileOpen(false);
+      setHelpOpen(true);
+    },
   });
 
   const toolbarGroups = (
@@ -86,7 +86,7 @@ export default function CanvasToolbar({
         <button type="button" className="rerooted-toolbar-button" onClick={() => void zoomIn({ duration: 150 })}>
           +
         </button>
-        <button type="button" className="rerooted-toolbar-button" onClick={() => void fitView({ duration: 250, padding: 0.2 })}>
+        <button type="button" className="rerooted-toolbar-button" onClick={handleFitCanvas}>
           ⊡ Fit
         </button>
       </div>
@@ -106,26 +106,14 @@ export default function CanvasToolbar({
         >
           ↔ LR
         </button>
-        <button type="button" className="rerooted-toolbar-button" onClick={onRelayout}>
-          ⟳ Neu
+        <button type="button" className="rerooted-toolbar-button" onClick={onRelayout} title="Neu anordnen">
+          ⟳
         </button>
       </div>
 
       <div className="rerooted-toolbar-group">
         <TemplatePicker />
-        <div className="rerooted-toolbar-subgroup" aria-label="Hintergrundtyp">
-          {backgroundOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`rerooted-toolbar-button${backgroundType === option.value ? ' is-active' : ''}`}
-              title={option.title}
-              onClick={() => setBackgroundType(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <BackgroundPicker />
       </div>
 
       <div className="rerooted-toolbar-group rerooted-toolbar-group--search">
@@ -140,7 +128,7 @@ export default function CanvasToolbar({
         />
       </div>
 
-      <div className="rerooted-toolbar-group">
+      <div className="rerooted-toolbar-group rerooted-toolbar-group--actions">
         <button type="button" className="rerooted-toolbar-button" onClick={() => navigate('/import')}>
           ↑ GED
         </button>
@@ -152,10 +140,16 @@ export default function CanvasToolbar({
         >
           {gedcomExport.isPending ? '… Export' : '↓ GED'}
         </button>
-        <button type="button" className="rerooted-toolbar-button" onClick={() => void exportAsPng()}>
-          📷 PNG
-        </button>
-        <button type="button" className="rerooted-toolbar-button" onClick={() => setHelpOpen(true)} title="Shortcuts anzeigen">
+        <ExportPicker />
+        <button
+          type="button"
+          className="rerooted-toolbar-button"
+          onClick={() => {
+            setMobileOpen(false);
+            setHelpOpen(true);
+          }}
+          title="Shortcuts anzeigen"
+        >
           ?
         </button>
       </div>

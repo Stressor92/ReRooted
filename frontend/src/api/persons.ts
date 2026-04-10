@@ -40,6 +40,8 @@ export interface PersonSummary extends Record<string, unknown> {
   is_living: boolean | null;
   birth_place_id?: string | null;
   description?: string | null;
+  current_address?: string | null;
+  phone_number?: string | null;
   gramps_id?: string | null;
   profile_image_url: string | null;
 }

@@ -1,4 +1,14 @@
-export type BackgroundType = 'dots' | 'lines' | 'cross' | 'none';
+export type BackgroundType = 'dots' | 'dots-dense' | 'dots-large' | 'lines' | 'lines-dense' | 'cross' | 'none';
+
+export const BACKGROUND_OPTIONS: Array<{ value: BackgroundType; label: string }> = [
+  { value: 'dots', label: 'Punkte' },
+  { value: 'dots-dense', label: 'Feine Punkte' },
+  { value: 'dots-large', label: 'Große Punkte' },
+  { value: 'lines', label: 'Linien' },
+  { value: 'lines-dense', label: 'Feine Linien' },
+  { value: 'cross', label: 'Kreuzraster' },
+  { value: 'none', label: 'Ohne Raster' },
+];
 
 export interface DesignTemplate {
   id: string;

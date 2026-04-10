@@ -17,6 +17,8 @@ class Person(Base):
     is_living = Column(Boolean, nullable=True)
     birth_place_id = Column(String, ForeignKey("places.id"), nullable=True)
     description = Column(String, nullable=True)
+    current_address = Column(String, nullable=True)
+    phone_number = Column(String, nullable=True)
     gramps_id = Column(String, nullable=True, index=True)
 
     birth_place = relationship("Place", foreign_keys=[birth_place_id])
