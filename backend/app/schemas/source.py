@@ -31,6 +31,11 @@ class CitationCreate(BaseModel):
     confidence: Confidence = Confidence.MEDIUM
 
 
+class CitationUpdate(BaseModel):
+    page: str | None = None
+    confidence: Confidence | None = None
+
+
 class CitationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

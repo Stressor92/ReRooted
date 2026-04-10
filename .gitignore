@@ -61,6 +61,16 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Project local data (never commit personal DB/content)
+rerooted.db
+rerooted.db-*
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+uploads/*
+!uploads/.gitkeep
+
 # Flask stuff:
 instance/
 .webassets-cache

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -40,3 +40,9 @@ def get_file(file_id: str, db: Annotated[Session, Depends(get_db)]):
     media_type = str(file_record.content_type) if file_record.content_type else None
     filename = str(file_record.filename) if file_record.filename else None
     return FileResponse(path=file_path, media_type=media_type, filename=filename)
+
+
+@router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_file(file_id: str, db: Annotated[Session, Depends(get_db)]):
+    file_service.delete_file(db, file_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

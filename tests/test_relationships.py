@@ -86,3 +86,30 @@ def test_relationship_update_rejects_unknown_person_reference(test_client) -> No
         "error": "not_found",
         "detail": f"Person {missing_person_id} not found",
     }
+
+
+def test_list_relationships_for_child_includes_parent_family(test_client) -> None:
+    suffix = uuid4().hex[:8]
+    parent_one = _create_person(test_client, f"Jordan{suffix}", f"Hill{suffix}")
+    parent_two = _create_person(test_client, f"Casey{suffix}", f"Hill{suffix}")
+    child = _create_person(test_client, f"Riley{suffix}", f"Hill{suffix}")
+
+    create_response = test_client.post(
+        "/relationships",
+        json={
+            "person1_id": parent_one,
+            "person2_id": parent_two,
+            "rel_type": "partner",
+            "child_ids": [child],
+        },
+    )
+    assert create_response.status_code == 201
+
+    response = test_client.get(f"/relationships?person_id={child}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["child_ids"] == [child]
+    assert payload[0]["person1_id"] == parent_one
+    assert payload[0]["person2_id"] == parent_two

@@ -5,7 +5,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Citation, Event, Person, Source
-from app.schemas.source import CitationCreate, SourceCreate
+from app.schemas.source import CitationCreate, CitationUpdate, SourceCreate
 
 
 def _not_found(entity: str, item_id: str) -> HTTPException:
@@ -95,6 +95,16 @@ def get_citations_for_event(db: Session, event_id: str) -> list[Citation]:
         .order_by(Citation.id.asc())
     )
     return list(db.scalars(stmt).all())
+
+
+def update_citation(db: Session, citation_id: str, data: CitationUpdate) -> Citation:
+    citation = get_citation(db, citation_id)
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(citation, key, value)
+    db.commit()
+    db.refresh(citation)
+    return get_citation(db, citation_id)
 
 
 def delete_citation(db: Session, citation_id: str) -> None:

@@ -24,7 +24,12 @@ class Settings(BaseSettings):
     upload_dir: Path = DEFAULT_UPLOAD_DIR
     max_upload_size_mb: int = 20
 
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
     def __init__(self, **values):
         super().__init__(**values)

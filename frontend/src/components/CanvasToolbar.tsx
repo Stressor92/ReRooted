@@ -1,0 +1,204 @@
+import { AnimatePresence, motion } from 'framer-motion';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useReactFlow, useStore } from '@xyflow/react';
+import { useCanvasExport } from '../hooks/useCanvasExport';
+import { useGedcomExport } from '../hooks/useGedcom';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useTemplate } from '../hooks/useTemplate';
+import type { BackgroundType } from '../design/templates/types';
+import CanvasSearch from './CanvasSearch';
+import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
+import TemplatePicker from './TemplatePicker';
+
+type CanvasToolbarProps = {
+  layoutDir: 'TB' | 'LR';
+  query: string;
+  resultCount: number;
+  onQueryChange: (value: string) => void;
+  onFocusMatch: () => void;
+  onOpenQuickAdd: () => void;
+  onChangeLayoutDir: (dir: 'TB' | 'LR') => void;
+  onRelayout: () => void;
+};
+
+export default function CanvasToolbar({
+  layoutDir,
+  query,
+  resultCount,
+  onQueryChange,
+  onFocusMatch,
+  onOpenQuickAdd,
+  onChangeLayoutDir,
+  onRelayout,
+}: CanvasToolbarProps) {
+  const navigate = useNavigate();
+  const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow();
+  const zoom = useStore((store) => store.transform[2] ?? 1);
+  const gedcomExport = useGedcomExport();
+  const { exportAsPng } = useCanvasExport();
+  const backgroundType = useTemplate((state) => state.backgroundType);
+  const setBackgroundType = useTemplate((state) => state.setBackgroundType);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  const zoomPercent = useMemo(() => `${Math.round(zoom * 100)}%`, [zoom]);
+
+  const focusSearch = () => {
+    const input = document.querySelector<HTMLInputElement>('.rerooted-toolbar-search');
+    input?.focus();
+    input?.select();
+  };
+
+  const backgroundOptions: Array<{ value: BackgroundType; label: string; title: string }> = [
+    { value: 'dots', label: '•', title: 'Gepunktet' },
+    { value: 'lines', label: '≡', title: 'Liniert' },
+    { value: 'cross', label: '#', title: 'Kreuzraster' },
+    { value: 'none', label: '∅', title: 'Ohne Raster' },
+  ];
+
+  useKeyboardShortcuts({
+    'ctrl+0': () => void fitView({ duration: 250, padding: 0.2 }),
+    'ctrl++': () => void zoomIn({ duration: 150 }),
+    'ctrl+=': () => void zoomIn({ duration: 150 }),
+    'ctrl+-': () => void zoomOut({ duration: 150 }),
+    'ctrl+f': focusSearch,
+    'ctrl+n': onOpenQuickAdd,
+    escape: () => {
+      setMobileOpen(false);
+      setHelpOpen(false);
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    },
+    '?': () => setHelpOpen(true),
+  });
+
+  const toolbarGroups = (
+    <>
+      <div className="rerooted-toolbar-group">
+        <button type="button" className="rerooted-toolbar-button" onClick={() => void zoomOut({ duration: 150 })}>
+          −
+        </button>
+        <button type="button" className="rerooted-toolbar-button is-wide" onClick={() => void zoomTo(1, { duration: 150 })}>
+          {zoomPercent}
+        </button>
+        <button type="button" className="rerooted-toolbar-button" onClick={() => void zoomIn({ duration: 150 })}>
+          +
+        </button>
+        <button type="button" className="rerooted-toolbar-button" onClick={() => void fitView({ duration: 250, padding: 0.2 })}>
+          ⊡ Fit
+        </button>
+      </div>
+
+      <div className="rerooted-toolbar-group">
+        <button
+          type="button"
+          className={`rerooted-toolbar-button${layoutDir === 'TB' ? ' is-active' : ''}`}
+          onClick={() => onChangeLayoutDir('TB')}
+        >
+          ↕ TB
+        </button>
+        <button
+          type="button"
+          className={`rerooted-toolbar-button${layoutDir === 'LR' ? ' is-active' : ''}`}
+          onClick={() => onChangeLayoutDir('LR')}
+        >
+          ↔ LR
+        </button>
+        <button type="button" className="rerooted-toolbar-button" onClick={onRelayout}>
+          ⟳ Neu
+        </button>
+      </div>
+
+      <div className="rerooted-toolbar-group">
+        <TemplatePicker />
+        <div className="rerooted-toolbar-subgroup" aria-label="Hintergrundtyp">
+          {backgroundOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`rerooted-toolbar-button${backgroundType === option.value ? ' is-active' : ''}`}
+              title={option.title}
+              onClick={() => setBackgroundType(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rerooted-toolbar-group rerooted-toolbar-group--search">
+        <button type="button" className="rerooted-toolbar-button is-primary" onClick={onOpenQuickAdd}>
+          + Person
+        </button>
+        <CanvasSearch
+          query={query}
+          resultCount={resultCount}
+          onQueryChange={onQueryChange}
+          onFocusMatch={onFocusMatch}
+        />
+      </div>
+
+      <div className="rerooted-toolbar-group">
+        <button type="button" className="rerooted-toolbar-button" onClick={() => navigate('/import')}>
+          ↑ GED
+        </button>
+        <button
+          type="button"
+          className="rerooted-toolbar-button"
+          onClick={() => gedcomExport.mutate()}
+          disabled={gedcomExport.isPending}
+        >
+          {gedcomExport.isPending ? '… Export' : '↓ GED'}
+        </button>
+        <button type="button" className="rerooted-toolbar-button" onClick={() => void exportAsPng()}>
+          📷 PNG
+        </button>
+        <button type="button" className="rerooted-toolbar-button" onClick={() => setHelpOpen(true)} title="Shortcuts anzeigen">
+          ?
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <div className="rerooted-canvas-toolbar">{toolbarGroups}</div>
+
+      <button type="button" className="rerooted-toolbar-fab" onClick={() => setMobileOpen(true)}>
+        ☰
+      </button>
+
+      <AnimatePresence>
+        {mobileOpen ? (
+          <>
+            <motion.div
+              className="rerooted-toolbar-sheet-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileOpen(false)}
+            />
+            <motion.div
+              className="rerooted-toolbar-sheet"
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+            >
+              <div className="rerooted-toolbar-sheet-header">
+                <strong>Canvas-Werkzeuge</strong>
+                <button type="button" className="rerooted-toolbar-button" onClick={() => setMobileOpen(false)}>
+                  ×
+                </button>
+              </div>
+              <div className="rerooted-toolbar-sheet-body">{toolbarGroups}</div>
+            </motion.div>
+          </>
+        ) : null}
+      </AnimatePresence>
+
+      <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+    </>
+  );
+}

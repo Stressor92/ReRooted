@@ -1,3 +1,1 @@
-export default function TreePage(): null {
-  return null;
-}
+export { default } from '../features/tree/TreePage';

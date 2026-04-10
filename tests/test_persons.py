@@ -104,3 +104,45 @@ def test_person_update_rejects_unknown_birth_place(test_client) -> None:
         "error": "not_found",
         "detail": f"Place {missing_place_id} not found",
     }
+
+
+def test_person_image_metadata_roundtrip(test_client) -> None:
+    suffix = uuid4().hex[:8]
+    person_response = test_client.post(
+        "/persons",
+        json={"first_name": f"Photo{suffix}", "last_name": f"Person{suffix}"},
+    )
+    assert person_response.status_code == 201
+    person_id = person_response.json()["id"]
+
+    upload_response = test_client.post(
+        "/files/upload",
+        files={"file": ("family.png", b"fake-image-bytes", "image/png")},
+    )
+    assert upload_response.status_code == 201
+    file_id = upload_response.json()["id"]
+
+    attach_response = test_client.post(
+        f"/persons/{person_id}/images",
+        data={"file_id": file_id, "is_profile": "true"},
+    )
+    assert attach_response.status_code == 201
+
+    detail_before = test_client.get(f"/persons/{person_id}")
+    assert detail_before.status_code == 200
+    image_id = detail_before.json()["images"][0]["id"]
+
+    patch_response = test_client.patch(
+        f"/persons/{person_id}/images/{image_id}",
+        json={
+            "caption": "Sommerfest",
+            "date_text": "1948",
+            "place_text": "Berlin",
+        },
+    )
+
+    assert patch_response.status_code == 200
+    detail = patch_response.json()
+    assert detail["images"][0]["caption"] == "Sommerfest"
+    assert detail["images"][0]["date_text"] == "1948"
+    assert detail["images"][0]["place_text"] == "Berlin"

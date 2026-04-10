@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas.source import CitationCreate, CitationOut, SourceCreate, SourceOut
+from app.schemas.source import CitationCreate, CitationOut, CitationUpdate, SourceCreate, SourceOut
 from app.services import source_service
 
 router = APIRouter(tags=["sources"])
@@ -52,6 +52,15 @@ def add_event_citation(
 @router.get("/events/{event_id}/citations", response_model=list[CitationOut])
 def list_event_citations(event_id: str, db: Annotated[Session, Depends(get_db)]):
     return source_service.get_citations_for_event(db, event_id)
+
+
+@router.patch("/citations/{citation_id}", response_model=CitationOut)
+def update_citation(
+    citation_id: str,
+    payload: CitationUpdate,
+    db: Annotated[Session, Depends(get_db)],
+):
+    return source_service.update_citation(db, citation_id, payload)
 
 
 @router.delete("/citations/{citation_id}", status_code=status.HTTP_204_NO_CONTENT)

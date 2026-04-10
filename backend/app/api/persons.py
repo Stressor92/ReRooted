@@ -1,10 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas.person import PersonCreate, PersonDetail, PersonOut, PersonUpdate
+from app.schemas.person import PersonCreate, PersonDetail, PersonImageUpdate, PersonOut, PersonUpdate
 from app.services import person_service
 
 router = APIRouter(tags=["persons"])
@@ -51,6 +51,18 @@ def delete_person(person_id: str, db: Annotated[Session, Depends(get_db)]):
 def upload_person_image(
     person_id: str,
     db: Annotated[Session, Depends(get_db)],
-    image: Annotated[UploadFile, File(...)],
+    image: Annotated[UploadFile | None, File()] = None,
+    file_id: Annotated[str | None, Form()] = None,
+    is_profile: Annotated[bool | None, Form()] = None,
 ):
-    return person_service.add_image(db, person_id, image)
+    return person_service.add_image(db, person_id, image, file_id=file_id, is_profile=is_profile)
+
+
+@router.patch("/persons/{person_id}/images/{image_id}", response_model=PersonDetail)
+def update_person_image(
+    person_id: str,
+    image_id: str,
+    payload: PersonImageUpdate,
+    db: Annotated[Session, Depends(get_db)],
+):
+    return person_service.update_image(db, person_id, image_id, payload)

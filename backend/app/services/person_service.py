@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.models import Event, File, Person, PersonImage, Place
-from app.schemas.person import PersonCreate, PersonUpdate
+from app.schemas.person import PersonCreate, PersonImageUpdate, PersonUpdate
 
 
 def _not_found(entity: str, item_id: str) -> HTTPException:
@@ -27,6 +27,42 @@ def _event_sort_key(event: Event) -> tuple[bool, date, str]:
 def _ensure_place_exists(db: Session, place_id: str) -> None:
     if db.get(Place, place_id) is None:
         raise _not_found("Place", place_id)
+
+
+def _ensure_file_exists(db: Session, file_id: str) -> File:
+    file_record = db.get(File, file_id)
+    if file_record is None:
+        raise _not_found("File", file_id)
+    return file_record
+
+
+def _get_person_image_or_404(person: Person, image_id: str) -> PersonImage:
+    image = next((item for item in person.images if str(item.id) == image_id), None)
+    if image is None:
+        raise _not_found("PersonImage", image_id)
+    return image
+
+
+def _attach_file_to_person(
+    db: Session,
+    person: Person,
+    file_id: str,
+    *,
+    is_profile: bool | None = None,
+) -> None:
+    _ensure_file_exists(db, file_id)
+    person_image = next((image for image in person.images if str(image.file_id) == file_id), None)
+
+    if person_image is None:
+        person_image = PersonImage(file_id=file_id, is_profile=False)
+        person.images.append(person_image)
+
+    should_set_profile = is_profile is True or (
+        is_profile is None and not any(image.is_profile is True for image in person.images)
+    )
+    if should_set_profile:
+        for image in person.images:
+            image.is_profile = str(image.file_id) == file_id
 
 
 def get_all(db: Session, search: str | None = None) -> list[Person]:
@@ -82,8 +118,13 @@ def update(db: Session, person_id: str, data: PersonUpdate) -> Person:
     if birth_place_id is not None:
         _ensure_place_exists(db, birth_place_id)
 
+    profile_image_id = update_data.pop("profile_image_id", None)
+
     for key, value in update_data.items():
         setattr(person, key, value)
+
+    if profile_image_id is not None:
+        _attach_file_to_person(db, person, profile_image_id, is_profile=True)
 
     db.commit()
     db.refresh(person)
@@ -96,8 +137,27 @@ def delete(db: Session, person_id: str) -> None:
     db.commit()
 
 
-def add_image(db: Session, person_id: str, upload: UploadFile) -> Person:
+def add_image(
+    db: Session,
+    person_id: str,
+    upload: UploadFile | None = None,
+    *,
+    file_id: str | None = None,
+    is_profile: bool | None = None,
+) -> Person:
     person = get_by_id(db, person_id)
+
+    if file_id is not None:
+        _attach_file_to_person(db, person, file_id, is_profile=is_profile)
+        db.commit()
+        db.refresh(person)
+        return get_by_id(db, person_id)
+
+    if upload is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"error": "invalid_file", "detail": "Provide an image upload or existing file_id"},
+        )
 
     if upload.content_type is None or not upload.content_type.startswith("image/"):
         raise HTTPException(
@@ -132,20 +192,35 @@ def add_image(db: Session, person_id: str, upload: UploadFile) -> Person:
     db.add(file_record)
     db.flush()
 
-    has_profile_image = any(image.is_profile is True for image in person.images)
-    person_image = PersonImage(
-        person_id=str(person.id),
-        file_id=str(file_record.id),
-        is_profile=not has_profile_image,
-    )
     try:
-        db.add(person_image)
+        _attach_file_to_person(db, person, str(file_record.id), is_profile=is_profile)
         db.commit()
     except Exception:
         db.rollback()
         destination.unlink(missing_ok=True)
         raise
 
+    return get_by_id(db, person_id)
+
+
+def update_image(db: Session, person_id: str, image_id: str, data: PersonImageUpdate) -> Person:
+    person = get_by_id(db, person_id)
+    image = _get_person_image_or_404(person, image_id)
+    payload = data.model_dump(exclude_unset=True)
+
+    is_profile = payload.pop("is_profile", None)
+    for key, value in payload.items():
+        setattr(image, key, value)
+
+    if is_profile is not None:
+        if is_profile:
+            for existing in person.images:
+                existing.is_profile = str(existing.id) == image_id
+        else:
+            image.is_profile = False
+
+    db.commit()
+    db.refresh(person)
     return get_by_id(db, person_id)
 
 

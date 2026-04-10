@@ -9,7 +9,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import File as StoredFile
+from app.models import File as StoredFile, PersonImage, Source
 
 
 def _not_found(file_id: str) -> HTTPException:
@@ -65,8 +65,12 @@ def _write_thumbnail(file_bytes: bytes, target: Path) -> None:
 
 
 async def upload(db: Session, file: UploadFile) -> StoredFile:
-    if file.content_type is None or not file.content_type.startswith("image/"):
-        raise _invalid_file("Only image uploads are allowed", status.HTTP_422_UNPROCESSABLE_CONTENT)
+    content_type = file.content_type or ""
+    if not (content_type.startswith("image/") or content_type == "application/pdf"):
+        raise _invalid_file(
+            "Only image or PDF uploads are allowed",
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
 
     max_size_bytes = settings.max_upload_size_mb * 1024 * 1024
     file_bytes = await file.read(max_size_bytes + 1)
@@ -85,7 +89,8 @@ async def upload(db: Session, file: UploadFile) -> StoredFile:
     absolute_path.write_bytes(file_bytes)
 
     thumb_path = _thumb_path_for(absolute_path)
-    _write_thumbnail(file_bytes, thumb_path)
+    if content_type.startswith("image/"):
+        _write_thumbnail(file_bytes, thumb_path)
 
     stored_file = StoredFile(
         filename=safe_name,
@@ -128,3 +133,24 @@ def get_thumb_path(db: Session, file_id: str) -> Path:
     if not thumb_path.exists():
         raise _not_found(file_id)
     return thumb_path
+
+
+def delete_file(db: Session, file_id: str) -> None:
+    file_record = get_file_record(db, file_id)
+    file_path: Path | None = None
+    try:
+        file_path = _resolve_path(str(file_record.path))
+    except ValueError:
+        file_path = None
+
+    db.query(PersonImage).filter(PersonImage.file_id == file_id).delete(synchronize_session=False)
+    db.query(Source).filter(Source.file_id == file_id).update(
+        {Source.file_id: None},
+        synchronize_session=False,
+    )
+    db.delete(file_record)
+    db.commit()
+
+    if file_path is not None:
+        file_path.unlink(missing_ok=True)
+        _thumb_path_for(file_path).unlink(missing_ok=True)

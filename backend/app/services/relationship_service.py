@@ -157,7 +157,13 @@ def get_for_person(db: Session, person_id: str) -> list[Relationship]:
     stmt = (
         select(Relationship)
         .options(joinedload(Relationship.children))
-        .where(or_(Relationship.person1_id == person_id, Relationship.person2_id == person_id))
+        .where(
+            or_(
+                Relationship.person1_id == person_id,
+                Relationship.person2_id == person_id,
+                Relationship.children.any(RelationshipChild.child_id == person_id),
+            )
+        )
         .order_by(Relationship.id.asc())
     )
     return list(db.execute(stmt).unique().scalars().all())
