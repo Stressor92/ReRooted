@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReactFlow, useStore } from '@xyflow/react';
+import { useCsvExport } from '../hooks/useCsvExport';
 import { useGedcomExport } from '../hooks/useGedcom';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import CanvasSearch from './CanvasSearch';
@@ -35,6 +36,7 @@ export default function CanvasToolbar({
   const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow();
   const zoom = useStore((store) => store.transform[2] ?? 1);
   const gedcomExport = useGedcomExport();
+  const csvExport = useCsvExport();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -139,6 +141,15 @@ export default function CanvasToolbar({
           disabled={gedcomExport.isPending}
         >
           {gedcomExport.isPending ? '… Export' : '↓ GED'}
+        </button>
+        <button
+          type="button"
+          className="rerooted-toolbar-button"
+          onClick={() => csvExport.mutate()}
+          disabled={csvExport.isPending}
+          title="Als CSV exportieren (Excel-kompatibel)"
+        >
+          {csvExport.isPending ? '… CSV' : '↓ CSV'}
         </button>
         <ExportPicker />
         <button

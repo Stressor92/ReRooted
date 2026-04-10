@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app import models  # noqa: F401
 from app.api import (
     events,
+    export,
     exports,
     files,
     gedcom,
@@ -102,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(tree.router)
     app.include_router(files.router or _placeholder_router("files"), prefix="/files")
     app.include_router(imports.router or _placeholder_router("import"), prefix="/import")
+    app.include_router(export.router or _placeholder_router("export"), prefix="/export")
     app.include_router(exports.router or _placeholder_router("export"), prefix="/export")
     app.include_router(gedcom.router)
 
