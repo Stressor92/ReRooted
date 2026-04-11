@@ -67,3 +67,26 @@ def test_event_crud_populates_date_sort_and_place_name(test_client) -> None:
 
     delete_response = test_client.delete(f"/events/{created_ids[-1]}")
     assert delete_response.status_code == 204
+
+
+def test_event_api_accepts_new_german_list_event_types(test_client) -> None:
+    suffix = uuid4().hex[:8]
+
+    person_response = test_client.post(
+        "/persons",
+        json={"first_name": f"Event{suffix}", "last_name": f"Catalog{suffix}"},
+    )
+    assert person_response.status_code == 201
+    person_id = person_response.json()["id"]
+
+    for event_type in ["engagement", "academic_degree", "retirement", "move", "displacement", "imprisonment", "adoption"]:
+        response = test_client.post(
+            f"/persons/{person_id}/events",
+            json={
+                "event_type": event_type,
+                "date_text": "1950",
+                "description": f"{event_type} event",
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["event_type"] == event_type

@@ -1,6 +1,14 @@
 from app.core.config import settings
 
 
+def test_runtime_paths_default_to_prod_and_keep_test_separate() -> None:
+    assert "/data/prod/" in settings.database_url.replace('\\', '/')
+    assert settings.upload_dir.as_posix().endswith('/uploads/prod')
+    assert settings.test_upload_dir.as_posix().endswith('/uploads/test')
+    assert settings.test_upload_dir != settings.upload_dir
+    assert settings.test_database_url != settings.database_url
+
+
 def test_healthcheck_returns_version(test_client) -> None:
     response = test_client.get("/health")
 

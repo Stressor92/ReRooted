@@ -8,7 +8,7 @@ from uuid import uuid4
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.config import LEGACY_UPLOAD_DIR, settings
 from app.models import File as StoredFile
 from app.models import PersonImage, Source
 
@@ -33,11 +33,26 @@ def _upload_root() -> Path:
     return root
 
 
+def _allowed_upload_roots() -> tuple[Path, ...]:
+    roots = [_upload_root()]
+    legacy_root = LEGACY_UPLOAD_DIR.resolve()
+    if legacy_root not in roots:
+        roots.append(legacy_root)
+    return tuple(roots)
+
+
 def _resolve_path(path_value: str) -> Path:
     path = Path(path_value)
     candidate = path.resolve() if path.is_absolute() else (Path.cwd() / path).resolve()
-    candidate.relative_to(_upload_root())
-    return candidate
+
+    for root in _allowed_upload_roots():
+        try:
+            candidate.relative_to(root)
+            return candidate
+        except ValueError:
+            continue
+
+    raise ValueError(f"Path {path_value!r} is outside the configured upload roots")
 
 
 def _safe_filename(filename: str | None, default_name: str) -> str:

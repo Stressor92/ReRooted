@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../api/client';
 import type { PersonDetail } from '../../../api/persons';
 import { useCreateSourceCitation, useUpdateCitation } from '../../../hooks/usePersonMutations';
+import { formatEventLabel } from '../../../utils/eventTypes';
 
 type SourcesTabProps = {
   person: PersonDetail;
@@ -87,7 +88,7 @@ export default function SourcesTab({ person }: SourcesTabProps) {
         eventCitations.map((citation) => ({
           ...citation,
           source: sourceMap.get(citation.source_id),
-          eventLabel: `${event.event_type}${event.date_text ? ` · ${event.date_text}` : ''}`,
+          eventLabel: formatEventLabel(event),
         })),
       );
     },
@@ -96,7 +97,7 @@ export default function SourcesTab({ person }: SourcesTabProps) {
   });
 
   const eventOptions = useMemo(
-    () => person.events.map((event) => ({ value: event.id, label: `${event.event_type}${event.date_text ? ` · ${event.date_text}` : ''}` })),
+    () => person.events.map((event) => ({ value: event.id, label: formatEventLabel(event) })),
     [person.events],
   );
 

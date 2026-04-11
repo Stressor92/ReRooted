@@ -61,7 +61,20 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# Project local data (never commit personal DB/content)
+# Project runtime data split
+data/*
+!data/.gitkeep
+!data/test/
+!data/test/**
+uploads/*
+!uploads/.gitkeep
+!uploads/test/
+!uploads/test/**
+exports/
+tmp/
+temp/
+
+# Never commit personal production DB/content
 rerooted.db
 rerooted.db-*
 *.db
@@ -72,11 +85,16 @@ rerooted.db-*
 *.sqlite-*
 *.sqlite3
 *.sqlite3-*
-uploads/**
-!uploads/.gitkeep
-exports/
-tmp/
-temp/
+data/prod/**
+uploads/prod/**
+!data/test/**/*.db
+!data/test/**/*.db-*
+!data/test/**/*.db-wal
+!data/test/**/*.db-shm
+!data/test/**/*.sqlite
+!data/test/**/*.sqlite-*
+!data/test/**/*.sqlite3
+!data/test/**/*.sqlite3-*
 
 # Flask stuff:
 instance/

@@ -6,10 +6,11 @@ from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
-from app.models import Event, File, Person, PersonImage, Place
+from app.models import Citation, Event, File, Person, PersonImage, Place, Relationship, RelationshipChild
 from app.schemas.person import PersonCreate, PersonImageUpdate, PersonUpdate
 
 
@@ -133,8 +134,62 @@ def update(db: Session, person_id: str, data: PersonUpdate) -> Person:
 
 def delete(db: Session, person_id: str) -> None:
     person = get_by_id(db, person_id)
-    db.delete(person)
-    db.commit()
+
+    related_relationships = list(
+        db.scalars(
+            select(Relationship).where(
+                or_(Relationship.person1_id == person_id, Relationship.person2_id == person_id)
+            )
+        ).all()
+    )
+    relationship_ids = [str(item.id) for item in related_relationships if item.id is not None]
+    relationship_count = len(relationship_ids)
+
+    child_link_count = db.query(RelationshipChild).filter(RelationshipChild.child_id == person_id).count()
+    citation_count = db.query(Citation).filter(Citation.person_id == person_id).count()
+
+    if relationship_ids:
+        db.query(RelationshipChild).filter(RelationshipChild.relationship_id.in_(relationship_ids)).delete(
+            synchronize_session=False,
+        )
+        db.query(Relationship).filter(Relationship.id.in_(relationship_ids)).delete(
+            synchronize_session=False,
+        )
+
+    if child_link_count:
+        db.query(RelationshipChild).filter(RelationshipChild.child_id == person_id).delete(
+            synchronize_session=False,
+        )
+
+    if citation_count:
+        db.query(Citation).filter(Citation.person_id == person_id).update(
+            {Citation.person_id: None},
+            synchronize_session=False,
+        )
+
+    try:
+        db.delete(person)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+
+        details: list[str] = []
+        if relationship_count:
+            details.append(f"{relationship_count} Beziehung(en)")
+        if child_link_count:
+            details.append(f"{child_link_count} Kind-Verknüpfung(en)")
+        if citation_count:
+            details.append(f"{citation_count} Quellenverweis(e)")
+
+        context = ", ".join(details) if details else "weitere verknüpfte Datensätze"
+        full_name = f"{person.first_name} {person.last_name}".strip()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "conflict",
+                "detail": f"Person '{full_name}' konnte nicht gelöscht werden. Bitte prüfen Sie zuerst: {context}.",
+            },
+        ) from exc
 
 
 def add_image(

@@ -76,6 +76,31 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
     }
 
 
+def test_delete_person_removes_linked_relationships_instead_of_returning_500(test_client) -> None:
+    suffix = uuid4().hex[:8]
+
+    first = test_client.post("/persons", json={"first_name": f"Jordan{suffix}", "last_name": "Root"})
+    second = test_client.post("/persons", json={"first_name": f"Casey{suffix}", "last_name": "Root"})
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    first_id = first.json()["id"]
+    second_id = second.json()["id"]
+
+    relationship_response = test_client.post(
+        "/relationships",
+        json={"person1_id": first_id, "person2_id": second_id, "rel_type": "partner"},
+    )
+    assert relationship_response.status_code == 201
+
+    delete_response = test_client.delete(f"/persons/{second_id}")
+    assert delete_response.status_code == 204
+
+    remaining_relationships = test_client.get(f"/relationships?person_id={first_id}")
+    assert remaining_relationships.status_code == 200
+    assert remaining_relationships.json() == []
+
+
 def test_place_autocomplete_limits_results_to_ten(test_client) -> None:
     prefix = f"AutoPlace-{uuid4().hex[:8]}"
 

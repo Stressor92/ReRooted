@@ -1,19 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { PersonEvent } from '../api/persons';
+import { EVENT_ICONS, EVENT_OPTIONS, formatEventLabel, formatEventTypeLabel } from '../utils/eventTypes';
 import FlexDateInput from './FlexDateInput';
 import PlaceAutocomplete from './PlaceAutocomplete';
-
-export const EVENT_ICONS: Record<string, string> = {
-  birth: '★',
-  death: '†',
-  baptism: '✟',
-  marriage: '♥',
-  divorce: '⚡',
-  emigration: '→',
-  immigration: '←',
-  occupation: '⚒',
-  other: '·',
-};
 
 type EventDraft = {
   event_type: string;
@@ -101,7 +90,7 @@ export default function EventTimeline({ events, onSaveEvent, onDeleteEvent }: Ev
             <div className="rerooted-timeline-icon">{EVENT_ICONS[event.event_type] ?? EVENT_ICONS.other}</div>
             <div className="rerooted-timeline-copy">
               <div className="rerooted-timeline-main">
-                <strong>{event.event_type}</strong>
+                <strong>{formatEventTypeLabel(event.event_type)}</strong>
                 <span>
                   {event.date_text ?? 'Datum offen'}
                   {event.place_name ? ` | ${event.place_name}` : ''}
@@ -140,9 +129,9 @@ export default function EventTimeline({ events, onSaveEvent, onDeleteEvent }: Ev
                 )
               }
             >
-              {Object.keys(EVENT_ICONS).map((eventType) => (
-                <option key={eventType} value={eventType}>
-                  {eventType}
+              {EVENT_OPTIONS.map((eventType) => (
+                <option key={eventType.value} value={eventType.value}>
+                  {eventType.label}
                 </option>
               ))}
             </select>

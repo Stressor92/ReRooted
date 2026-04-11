@@ -12,14 +12,21 @@ from app.core.database import Base
 class EventType(str, enum.Enum):
     BIRTH = "birth"
     DEATH = "death"
-    BAPTISM = "baptism"
+    ENGAGEMENT = "engagement"
     MARRIAGE = "marriage"
     DIVORCE = "divorce"
+    BAPTISM = "baptism"
+    ACADEMIC_DEGREE = "academic_degree"
+    RETIREMENT = "retirement"
+    MOVE = "move"
     EMIGRATION = "emigration"
+    DISPLACEMENT = "displacement"
+    IMPRISONMENT = "imprisonment"
+    ADOPTION = "adoption"
+    OTHER = "other"
     IMMIGRATION = "immigration"
     OCCUPATION = "occupation"
     RESIDENCE = "residence"
-    OTHER = "other"
 
 
 class Event(Base):

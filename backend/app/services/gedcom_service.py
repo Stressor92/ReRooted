@@ -16,10 +16,17 @@ from app.utils.date_parser import parse_flex_date
 GEDCOM_EVENT_MAP = {
     "BIRT": EventType.BIRTH,
     "DEAT": EventType.DEATH,
+    "ENGA": EventType.ENGAGEMENT,
     "MARR": EventType.MARRIAGE,
+    "DIV": EventType.DIVORCE,
     "BAPM": EventType.BAPTISM,
+    "GRAD": EventType.ACADEMIC_DEGREE,
+    "RETI": EventType.RETIREMENT,
+    "RESI": EventType.MOVE,
+    "EMIG": EventType.EMIGRATION,
+    "EVEN": EventType.OTHER,
+    "ADOP": EventType.ADOPTION,
 }
-
 
 def preview_gedcom(file_bytes: bytes) -> dict[str, int]:
     parsed = _parse_bytes(file_bytes)

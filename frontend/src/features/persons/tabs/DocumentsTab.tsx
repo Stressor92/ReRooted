@@ -7,6 +7,7 @@ import { apiClient } from '../../../api/client';
 import { downloadFile, resolveFileUrl } from '../../../api/files';
 import type { PersonDetail } from '../../../api/persons';
 import { useCreateSourceCitation, useDeletePersonFile } from '../../../hooks/usePersonMutations';
+import { formatEventLabel } from '../../../utils/eventTypes';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 
@@ -63,9 +64,7 @@ export default function DocumentsTab({ person }: DocumentsTabProps) {
       ]);
 
       const sourceMap = new Map(sources.map((source) => [source.id, source]));
-      const eventMap = new Map(
-        person.events.map((event) => [event.id, `${event.event_type}${event.date_text ? ` · ${event.date_text}` : ''}`]),
-      );
+      const eventMap = new Map(person.events.map((event) => [event.id, formatEventLabel(event)]));
 
       return citations
         .map((citation) => ({
@@ -118,7 +117,7 @@ export default function DocumentsTab({ person }: DocumentsTabProps) {
   });
 
   const eventOptions = useMemo(
-    () => person.events.map((event) => ({ value: event.id, label: `${event.event_type}${event.date_text ? ` · ${event.date_text}` : ''}` })),
+    () => person.events.map((event) => ({ value: event.id, label: formatEventLabel(event) })),
     [person.events],
   );
 
