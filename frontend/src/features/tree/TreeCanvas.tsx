@@ -12,6 +12,7 @@ import {
   type NodeMouseHandler,
 } from '@xyflow/react';
 import { useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, getApiErrorMessage } from '../../api/client';
@@ -19,11 +20,13 @@ import type { CreatePersonResult } from '../../hooks/useCreatePerson';
 import { useAddChild } from '../../hooks/useRelationshipMutations';
 import { useCanvasSearch } from '../../hooks/useCanvasSearch';
 import { useContextMenu } from '../../hooks/useContextMenu';
+import { useCustomDesign } from '../../hooks/useCustomDesign';
 import { useTemplate } from '../../hooks/useTemplate';
 import { useToastStore } from '../../hooks/useToast';
 import EmptyState from '../../components/EmptyState';
 import CanvasToolbar from '../../components/CanvasToolbar';
 import ContextMenu from '../../components/ContextMenu';
+import CustomDesignPanel from '../../design/CustomDesignPanel';
 import type { EdgeData, PersonNodeData } from '../../api/tree';
 import QuickAddPopover, {
   type QuickAddPreset,
@@ -190,6 +193,7 @@ export default function TreeCanvas({
   const addToast = useToastStore((state) => state.addToast);
   const addChild = useAddChild();
   const backgroundType = useTemplate((state) => state.backgroundType);
+  const showCustomPanel = useCustomDesign((state) => state.showPanel);
   const [quickAddState, setQuickAddState] = useState<QuickAddState>(null);
   const [relationshipState, setRelationshipState] = useState<RelationshipDialogState>(null);
   const { menu, onNodeContextMenu, closeMenu } = useContextMenu();
@@ -438,7 +442,7 @@ export default function TreeCanvas({
   }, [decoratedNodes, fitView, fitViewOptions, nodesInitialized]);
 
   return (
-    <div className={`rerooted-tree-shell${selectedPersonId ? ' is-panel-open' : ''}`}>
+    <div className={`rerooted-tree-shell${selectedPersonId ? ' is-panel-open' : ''}${showCustomPanel ? ' is-custom-panel-open' : ''}`}>
       <div className="rerooted-flow-area">
         <ReactFlow<FlowNode, FlowEdge>
           nodes={decoratedNodes}
@@ -490,6 +494,8 @@ export default function TreeCanvas({
           </div>
         ) : null}
       </div>
+
+      <AnimatePresence>{showCustomPanel ? <CustomDesignPanel /> : null}</AnimatePresence>
 
       <ContextMenu
         menu={menu}

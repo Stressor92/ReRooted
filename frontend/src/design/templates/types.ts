@@ -10,6 +10,14 @@ export const BACKGROUND_OPTIONS: Array<{ value: BackgroundType; label: string }>
   { value: 'none', label: 'Ohne Raster' },
 ];
 
+export interface NodeShapeConfig {
+  cardRadius: number;
+  photoShape: 'circle' | 'rounded' | 'square' | 'diamond';
+  photoBorderStyle: 'solid' | 'double' | 'none';
+  shadowIntensity: 'none' | 'subtle' | 'medium' | 'dramatic';
+  dividerStyle: 'none' | 'line' | 'dot';
+}
+
 export interface DesignTemplate {
   id: string;
   name: string;
@@ -22,12 +30,11 @@ export interface DesignTemplate {
     background: string;
     border: string;
     borderWidth: number;
-    borderRadius: number;
-    shadow: string;
-    photoBorder: string;
-    photoBorderWidth: number;
     nameColor: string;
     dateColor: string;
+    photoBorder: string;
+    photoBorderWidth: number;
+    shape: NodeShapeConfig;
   };
   panel?: {
     background: string;
@@ -35,24 +42,51 @@ export interface DesignTemplate {
   };
   accent: string;
   fontFamily: string;
+  isCustom?: boolean;
 }
 
-export function applyTemplate(t: DesignTemplate): void {
-  const r = document.documentElement.style;
-  r.setProperty('--canvas-bg', t.canvas.background);
-  r.setProperty('--canvas-dot-color', t.canvas.dotColor ?? 'rgba(255,255,255,0.1)');
-  r.setProperty('--node-bg', t.node.background);
-  r.setProperty('--node-border', t.node.border);
-  r.setProperty('--node-border-width', `${t.node.borderWidth}px`);
-  r.setProperty('--node-radius', `${t.node.borderRadius}px`);
-  r.setProperty('--node-shadow', t.node.shadow);
-  r.setProperty('--node-name-color', t.node.nameColor);
-  r.setProperty('--node-date-color', t.node.dateColor);
-  r.setProperty('--panel-bg', t.panel?.background ?? t.node.background);
-  r.setProperty('--panel-border', t.panel?.border ?? t.node.border);
-  r.setProperty('--accent', t.accent);
-  r.setProperty('--photo-border', t.node.photoBorder);
-  r.setProperty('--photo-border-width', `${t.node.photoBorderWidth}px`);
-  r.setProperty('--accent-glow', `0 0 0 2px ${t.accent}, 0 8px 32px rgba(0,0,0,0.5)`);
-  r.setProperty('--font-family', t.fontFamily);
+function shadowForIntensity(intensity: NodeShapeConfig['shadowIntensity']): string {
+  switch (intensity) {
+    case 'none':
+      return 'none';
+    case 'subtle':
+      return '0 2px 8px rgba(0,0,0,0.25)';
+    case 'dramatic':
+      return '0 12px 40px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.3)';
+    case 'medium':
+    default:
+      return '0 4px 20px rgba(0,0,0,0.4)';
+  }
+}
+
+export function applyTemplate(template: DesignTemplate): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const root = document.documentElement;
+  const style = root.style;
+  const shadow = shadowForIntensity(template.node.shape.shadowIntensity);
+
+  style.setProperty('--canvas-bg', template.canvas.background);
+  style.setProperty('--canvas-dot-color', template.canvas.dotColor ?? 'rgba(255,255,255,0.1)');
+  style.setProperty('--node-bg', template.node.background);
+  style.setProperty('--node-border', template.node.border);
+  style.setProperty('--node-border-width', `${template.node.borderWidth}px`);
+  style.setProperty('--node-radius', `${template.node.shape.cardRadius}px`);
+  style.setProperty('--node-shadow', shadow);
+  style.setProperty('--node-name-color', template.node.nameColor);
+  style.setProperty('--node-date-color', template.node.dateColor);
+  style.setProperty('--panel-bg', template.panel?.background ?? template.node.background);
+  style.setProperty('--panel-border', template.panel?.border ?? template.node.border);
+  style.setProperty('--accent', template.accent);
+  style.setProperty('--photo-border', template.node.photoBorder);
+  style.setProperty('--photo-border-width', `${template.node.photoBorderWidth}px`);
+  style.setProperty('--photo-border-style', template.node.shape.photoBorderStyle);
+  style.setProperty('--accent-glow', `0 0 0 2px ${template.accent}, 0 8px 32px rgba(0,0,0,0.5)`);
+  style.setProperty('--font-family', template.fontFamily);
+
+  root.dataset.photoShape = template.node.shape.photoShape;
+  root.dataset.shadowIntensity = template.node.shape.shadowIntensity;
+  root.dataset.divider = template.node.shape.dividerStyle;
 }

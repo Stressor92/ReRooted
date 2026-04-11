@@ -72,7 +72,7 @@ ReRooted/
 ├─ docs/                       Architektur- und Entwicklerdokumentation
 ├─ tests/                      Unit-, Integrations- und API-Tests
 ├─ uploads/                    hochgeladene Dateien und Thumbnails
-├─ media-tool.toml             Konfigurationsreferenz
+├─ rerooted.toml               Konfigurationsreferenz
 ├─ pyproject.toml              Repo-weite Tooling-/QA-Konfiguration
 └─ requirements.txt            Python-Install für lokale Entwicklung
 ```
@@ -118,7 +118,7 @@ Set-Location ..
 
 Die laufende Anwendung liest ihre Backend-Konfiguration aus Umgebungsvariablen bzw. einer optionalen `.env`-Datei über `backend/app/core/config.py`.
 
-`media-tool.toml` dient im Repository als **menschlich lesbare Referenz** derselben Standardwerte.
+`rerooted.toml` dient im Repository als **menschlich lesbare Referenz** derselben Standardwerte.
 
 ### Wichtige Backend-Einstellungen
 

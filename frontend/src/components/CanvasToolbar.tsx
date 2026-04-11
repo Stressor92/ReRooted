@@ -78,91 +78,95 @@ export default function CanvasToolbar({
 
   const toolbarGroups = (
     <>
-      <div className="rerooted-toolbar-group">
-        <button type="button" className="rerooted-toolbar-button" onClick={() => void zoomOut({ duration: 150 })}>
-          −
-        </button>
-        <button type="button" className="rerooted-toolbar-button is-wide" onClick={() => void zoomTo(1, { duration: 150 })}>
-          {zoomPercent}
-        </button>
-        <button type="button" className="rerooted-toolbar-button" onClick={() => void zoomIn({ duration: 150 })}>
-          +
-        </button>
-        <button type="button" className="rerooted-toolbar-button" onClick={handleFitCanvas}>
-          ⊡ Fit
-        </button>
+      <div className="rerooted-toolbar-row rerooted-toolbar-row--primary">
+        <div className="rerooted-toolbar-group">
+          <button type="button" className="rerooted-toolbar-button" onClick={() => void zoomOut({ duration: 150 })}>
+            −
+          </button>
+          <button type="button" className="rerooted-toolbar-button is-wide" onClick={() => void zoomTo(1, { duration: 150 })}>
+            {zoomPercent}
+          </button>
+          <button type="button" className="rerooted-toolbar-button" onClick={() => void zoomIn({ duration: 150 })}>
+            +
+          </button>
+          <button type="button" className="rerooted-toolbar-button" onClick={handleFitCanvas}>
+            ⊡ Fit
+          </button>
+        </div>
+
+        <div className="rerooted-toolbar-group">
+          <button
+            type="button"
+            className={`rerooted-toolbar-button${layoutDir === 'TB' ? ' is-active' : ''}`}
+            onClick={() => onChangeLayoutDir('TB')}
+          >
+            ↕ TB
+          </button>
+          <button
+            type="button"
+            className={`rerooted-toolbar-button${layoutDir === 'LR' ? ' is-active' : ''}`}
+            onClick={() => onChangeLayoutDir('LR')}
+          >
+            ↔ LR
+          </button>
+          <button type="button" className="rerooted-toolbar-button" onClick={onRelayout} title="Neu anordnen">
+            ⟳
+          </button>
+        </div>
+
+        <div className="rerooted-toolbar-group">
+          <TemplatePicker />
+          <BackgroundPicker />
+        </div>
       </div>
 
-      <div className="rerooted-toolbar-group">
-        <button
-          type="button"
-          className={`rerooted-toolbar-button${layoutDir === 'TB' ? ' is-active' : ''}`}
-          onClick={() => onChangeLayoutDir('TB')}
-        >
-          ↕ TB
-        </button>
-        <button
-          type="button"
-          className={`rerooted-toolbar-button${layoutDir === 'LR' ? ' is-active' : ''}`}
-          onClick={() => onChangeLayoutDir('LR')}
-        >
-          ↔ LR
-        </button>
-        <button type="button" className="rerooted-toolbar-button" onClick={onRelayout} title="Neu anordnen">
-          ⟳
-        </button>
-      </div>
+      <div className="rerooted-toolbar-row rerooted-toolbar-row--secondary">
+        <div className="rerooted-toolbar-group rerooted-toolbar-group--search">
+          <button type="button" className="rerooted-toolbar-button is-primary" onClick={onOpenQuickAdd}>
+            + Person
+          </button>
+          <CanvasSearch
+            query={query}
+            resultCount={resultCount}
+            onQueryChange={onQueryChange}
+            onFocusMatch={onFocusMatch}
+          />
+        </div>
 
-      <div className="rerooted-toolbar-group">
-        <TemplatePicker />
-        <BackgroundPicker />
-      </div>
-
-      <div className="rerooted-toolbar-group rerooted-toolbar-group--search">
-        <button type="button" className="rerooted-toolbar-button is-primary" onClick={onOpenQuickAdd}>
-          + Person
-        </button>
-        <CanvasSearch
-          query={query}
-          resultCount={resultCount}
-          onQueryChange={onQueryChange}
-          onFocusMatch={onFocusMatch}
-        />
-      </div>
-
-      <div className="rerooted-toolbar-group rerooted-toolbar-group--actions">
-        <button type="button" className="rerooted-toolbar-button" onClick={() => navigate('/import')}>
-          ↑ GED
-        </button>
-        <button
-          type="button"
-          className="rerooted-toolbar-button"
-          onClick={() => gedcomExport.mutate()}
-          disabled={gedcomExport.isPending}
-        >
-          {gedcomExport.isPending ? '… Export' : '↓ GED'}
-        </button>
-        <button
-          type="button"
-          className="rerooted-toolbar-button"
-          onClick={() => csvExport.mutate()}
-          disabled={csvExport.isPending}
-          title="Als CSV exportieren (Excel-kompatibel)"
-        >
-          {csvExport.isPending ? '… CSV' : '↓ CSV'}
-        </button>
-        <ExportPicker />
-        <button
-          type="button"
-          className="rerooted-toolbar-button"
-          onClick={() => {
-            setMobileOpen(false);
-            setHelpOpen(true);
-          }}
-          title="Shortcuts anzeigen"
-        >
-          ?
-        </button>
+        <div className="rerooted-toolbar-group rerooted-toolbar-group--actions">
+          <button type="button" className="rerooted-toolbar-button" onClick={() => navigate('/import')}>
+            ↑ GED
+          </button>
+          <button
+            type="button"
+            className="rerooted-toolbar-button"
+            onClick={() => gedcomExport.mutate()}
+            disabled={gedcomExport.isPending}
+          >
+            {gedcomExport.isPending ? '… Export' : '↓ GED'}
+          </button>
+          <button
+            type="button"
+            className="rerooted-toolbar-button"
+            onClick={() => csvExport.mutate()}
+            disabled={csvExport.isPending}
+            title="Als CSV exportieren (Excel-kompatibel)"
+          >
+            {csvExport.isPending ? '… CSV' : '↓ CSV'}
+          </button>
+          <ExportPicker />
+          <button
+            type="button"
+            className="rerooted-toolbar-button"
+            onClick={() => {
+              setMobileOpen(false);
+              setHelpOpen(true);
+            }}
+            title="Shortcuts anzeigen"
+          >
+            ?
+          </button>
+        </div>
       </div>
     </>
   );

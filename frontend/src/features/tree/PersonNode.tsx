@@ -87,6 +87,8 @@ const PersonNode = memo(function PersonNode({
         </div>
       )}
 
+      {mode !== 'micro' ? <div className="rerooted-person-divider" aria-hidden="true" /> : null}
+
       {mode !== 'micro' ? (
         <div className="rerooted-person-copy">
           <div className="rerooted-person-name">{label}</div>

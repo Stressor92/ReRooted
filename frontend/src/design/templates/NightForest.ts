@@ -6,25 +6,30 @@ export const NightForest: DesignTemplate = {
   canvas: {
     background: '#0D1B0F',
     backgroundType: 'dots',
-    dotColor: 'rgba(29,158,117,0.25)',
+    dotColor: 'rgba(29,158,117,0.2)',
   },
   node: {
-    background: '#F4FAF5',
-    border: '#8FB596',
+    background: '#1A2B1C',
+    border: '#2A4A2D',
     borderWidth: 1,
-    borderRadius: 14,
-    shadow: '0 10px 28px rgba(0,0,0,0.35)',
-    photoBorder: '#08110A',
+    nameColor: '#E8F5E9',
+    dateColor: '#81C784',
+    photoBorder: '#000000',
     photoBorderWidth: 3,
-    nameColor: '#122818',
-    dateColor: '#2F6B47',
+    shape: {
+      cardRadius: 14,
+      photoShape: 'circle',
+      photoBorderStyle: 'solid',
+      shadowIntensity: 'medium',
+      dividerStyle: 'dot',
+    },
   },
   panel: {
-    background: '#EEF7EF',
-    border: '#8FB596',
+    background: '#132116',
+    border: '#2A4A2D',
   },
   accent: '#1D9E75',
-  fontFamily: 'Inter, "Segoe UI", sans-serif',
+  fontFamily: "'Inter', sans-serif",
 };
 
 export default NightForest;
