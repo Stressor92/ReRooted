@@ -1,8 +1,10 @@
 import { Handle, Position, useStore, type Node, type NodeProps } from '@xyflow/react';
 import { motion } from 'framer-motion';
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { resolveApiUrl } from '../../api/client';
 import type { PersonNodeData } from '../../api/tree';
+import { useTemplate } from '../../hooks/useTemplate';
+import { getAvatarUrl, hasProfileImage } from '../../utils/avatarUtils';
 import {
   PARTNER_LEFT_HANDLE_ID,
   PARTNER_RIGHT_HANDLE_ID,
@@ -58,8 +60,20 @@ const PersonNode = memo(function PersonNode({
   const photoSize = mode === 'full' ? 80 : 64;
   const width = mode === 'full' ? 160 : mode === 'compact' ? 120 : 64;
   const label = `${data.first_name} ${data.last_name}`.trim();
+  const initials = getInitials(data.first_name, data.last_name);
   const lifeDates = formatLifeDates(data.birth_year, data.death_year);
   const showPartnerHandles = targetPosition === Position.Top && sourcePosition === Position.Bottom;
+  const showPersonas = useTemplate((state) => state.showPersonas);
+  const photoSrc = hasProfileImage(data.profile_image_url)
+    ? resolveApiUrl(data.profile_image_url) ?? data.profile_image_url
+    : showPersonas
+      ? getAvatarUrl(data.generation ?? 0, data.gender ?? null)
+      : null;
+  const [showInitialsFallback, setShowInitialsFallback] = useState(false);
+
+  useEffect(() => {
+    setShowInitialsFallback(false);
+  }, [photoSrc]);
 
   return (
     <motion.div
@@ -79,22 +93,35 @@ const PersonNode = memo(function PersonNode({
       {showPartnerHandles ? <Handle id={PARTNER_RIGHT_HANDLE_ID} type="source" position={Position.Right} /> : null}
       <span className="rerooted-status-dot" style={{ background: getStatusColor(data.is_living) }} />
 
-      {data.profile_image_url ? (
+      {photoSrc && !showInitialsFallback ? (
         <img
           className="rerooted-person-photo"
-          src={resolveApiUrl(data.profile_image_url) ?? undefined}
+          src={photoSrc}
           alt={label}
           style={{ width: photoSize, height: photoSize }}
+          onError={() => setShowInitialsFallback(true)}
         />
-      ) : (
+      ) : null}
+
+      {showInitialsFallback ? (
         <div
           className="rerooted-person-photo rerooted-person-photo--fallback"
           style={{ width: photoSize, height: photoSize }}
           aria-label={label}
         >
-          {getInitials(data.first_name, data.last_name)}
+          {initials}
         </div>
-      )}
+      ) : null}
+
+      {!photoSrc && !showInitialsFallback ? (
+        <div
+          className="rerooted-person-photo rerooted-person-photo--fallback"
+          style={{ width: photoSize, height: photoSize }}
+          aria-label={label}
+        >
+          {initials}
+        </div>
+      ) : null}
 
       {mode !== 'micro' ? <div className="rerooted-person-divider" aria-hidden="true" /> : null}
 

@@ -231,6 +231,7 @@ a {
   border: var(--photo-border-width) var(--photo-border-style, solid) var(--photo-border);
   box-shadow: var(--photo-shadow);
   object-fit: cover;
+  object-position: center top;
   background: color-mix(in srgb, var(--accent) 28%, var(--node-bg));
   transition: border-radius 180ms ease, clip-path 180ms ease, box-shadow 180ms ease;
 }
@@ -461,6 +462,7 @@ html[data-divider='dot'] .rerooted-person-divider::after {
 
 .rerooted-panel-profile-image {
   object-fit: cover;
+  object-position: center top;
 }
 
 .rerooted-panel-header-copy {

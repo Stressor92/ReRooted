@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { uploadFile } from '../../api/files';
 import type { PersonDetail } from '../../api/persons';
 import { resolveApiUrl } from '../../api/client';
+import { useTemplate } from '../../hooks/useTemplate';
 import { useUpdatePerson } from '../../hooks/usePersonMutations';
+import { getAvatarUrl, hasProfileImage } from '../../utils/avatarUtils';
 
 type PersonPanelHeaderProps = {
   person: PersonDetail;
@@ -12,6 +14,30 @@ type PersonPanelHeaderProps = {
   onDeleteRequest: () => void;
   onCreateRelative?: (kind: 'child' | 'partner' | 'parent' | 'sibling') => void;
 };
+
+function estimateGenerationFromAge(birthYear: string | null | undefined): number {
+  if (!birthYear) {
+    return 1;
+  }
+
+  const match = birthYear.match(/(18|19|20)\d{2}/);
+  const year = match ? Number(match[0]) : Number.NaN;
+  if (!Number.isFinite(year)) {
+    return 1;
+  }
+
+  const age = new Date().getFullYear() - year;
+  if (age < 20) {
+    return 0;
+  }
+  if (age < 40) {
+    return 1;
+  }
+  if (age < 60) {
+    return 2;
+  }
+  return 3;
+}
 
 export default function PersonPanelHeader({
   person,
@@ -32,6 +58,20 @@ export default function PersonPanelHeader({
     setFirstName(person.first_name);
     setLastName(person.last_name);
   }, [person.first_name, person.last_name]);
+
+  const showPersonas = useTemplate((state) => state.showPersonas);
+  const birthEvent = person.events.find((event) => event.event_type === 'birth');
+  const estimatedGeneration = estimateGenerationFromAge(birthEvent?.date_text ?? null);
+  const fallbackAvatarUrl = showPersonas ? getAvatarUrl(estimatedGeneration, person.gender ?? null) : null;
+  const imageUrl = previewUrl
+    ?? (hasProfileImage(person.profile_image_url)
+      ? resolveApiUrl(person.profile_image_url) ?? person.profile_image_url
+      : fallbackAvatarUrl);
+  const [showInitialsFallback, setShowInitialsFallback] = useState(false);
+
+  useEffect(() => {
+    setShowInitialsFallback(false);
+  }, [imageUrl]);
 
   const saveName = async () => {
     const nextFirstName = firstName.trim() || person.first_name;
@@ -65,8 +105,6 @@ export default function PersonPanelHeader({
     }
   };
 
-  const imageUrl = previewUrl ?? resolveApiUrl(person.profile_image_url);
-
   return (
     <header className="rerooted-panel-header">
       <button type="button" className="rerooted-close-button" onClick={onClose} aria-label="Panel schließen">
@@ -76,13 +114,24 @@ export default function PersonPanelHeader({
       <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(event) => void handleProfileUpload(event)} />
 
       <button type="button" className="rerooted-profile-button" onClick={() => fileInputRef.current?.click()}>
-        {imageUrl ? (
-          <img className="rerooted-panel-profile-image" src={imageUrl} alt={`${person.first_name} ${person.last_name}`} />
-        ) : (
+        {imageUrl && !showInitialsFallback ? (
+          <img
+            className="rerooted-panel-profile-image"
+            src={imageUrl}
+            alt={`${person.first_name} ${person.last_name}`}
+            onError={() => setShowInitialsFallback(true)}
+          />
+        ) : null}
+        {showInitialsFallback ? (
           <div className="rerooted-panel-profile-image rerooted-person-photo--fallback rerooted-panel-profile-fallback">
             {`${person.first_name.charAt(0)}${person.last_name.charAt(0)}`.toUpperCase()}
           </div>
-        )}
+        ) : null}
+        {!imageUrl && !showInitialsFallback ? (
+          <div className="rerooted-panel-profile-image rerooted-person-photo--fallback rerooted-panel-profile-fallback">
+            {`${person.first_name.charAt(0)}${person.last_name.charAt(0)}`.toUpperCase()}
+          </div>
+        ) : null}
       </button>
 
       <div className="rerooted-panel-header-copy">

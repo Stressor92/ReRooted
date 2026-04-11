@@ -3,6 +3,7 @@ import FlexDateInput from '../../../components/FlexDateInput';
 export const REL_TYPES = [
   { value: 'partner', label: 'Ehe / Partnerschaft', icon: '♥', color: '#1D9E75' },
   { value: 'ex', label: 'Ex-Partnerschaft', icon: '♡', color: '#1D9E75' },
+  { value: 'sibling', label: 'Geschwister', icon: '↔', color: '#4F6BFF' },
   { value: 'biological', label: 'Biologisch (Kind)', icon: '⬇', color: '#888780' },
   { value: 'adoption', label: 'Adoption', icon: '⟳', color: '#BA7517' },
   { value: 'foster', label: 'Pflegekind', icon: '⌂', color: '#D85A30' },

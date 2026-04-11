@@ -12,6 +12,7 @@ import type { EdgeData } from '../../api/tree';
 const EDGE_STYLES: Record<string, CSSProperties> = {
   biological: { stroke: 'var(--edge-biological)', strokeWidth: 2 },
   marriage: { stroke: 'var(--edge-marriage)', strokeWidth: 2.5 },
+  sibling: { stroke: 'var(--accent)', strokeWidth: 2, strokeDasharray: '10 4 2 4' },
   divorced: { stroke: 'var(--edge-divorced)', strokeWidth: 1.5, strokeDasharray: '8 4' },
   adoption: { stroke: 'var(--edge-adoption)', strokeWidth: 2, strokeDasharray: '6 3' },
   foster: { stroke: 'var(--edge-foster)', strokeWidth: 1.5, strokeDasharray: '4 4' },
@@ -30,6 +31,10 @@ function resolveEdgeStyle(edgeType: 'partner' | 'child', relType?: string): CSSP
 
   if (relType === 'foster') {
     return EDGE_STYLES.foster;
+  }
+
+  if (relType === 'sibling') {
+    return EDGE_STYLES.sibling;
   }
 
   if (relType === 'ex' || relType === 'divorced') {
@@ -53,7 +58,7 @@ function formatTypeLabel(edgeType: 'partner' | 'child', relType?: string): strin
       case 'unknown':
         return 'Unbekannt';
       default:
-        return 'Biologisches Kind';
+        return '';
     }
   }
 
@@ -62,6 +67,8 @@ function formatTypeLabel(edgeType: 'partner' | 'child', relType?: string): strin
       return 'Partner';
     case 'ex':
       return 'Getrennt';
+    case 'sibling':
+      return 'Geschwister';
     case 'adoption':
       return 'Adoption';
     case 'foster':
@@ -122,6 +129,7 @@ const FamilyEdge = memo(function FamilyEdge({
   };
 
   const period = [formatDate(data?.start_date), formatDate(data?.end_date)].filter(Boolean).join(' – ');
+  const typeLabel = formatTypeLabel(type === 'partner' ? 'partner' : 'child', data?.rel_type);
 
   return (
     <>
@@ -130,33 +138,35 @@ const FamilyEdge = memo(function FamilyEdge({
         <path d={edgePath} fill="none" stroke="transparent" strokeWidth={16} />
       </g>
 
-      <EdgeLabelRenderer>
-        <div
-          style={{
-            position: 'absolute',
-            left: labelX,
-            top: labelY,
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'all',
-            textAlign: 'center',
-          }}
-        >
-          <button
-            type="button"
-            className="rerooted-edge-label rerooted-edge-label-button"
-            style={{ opacity: hovered ? 1 : 0.85 }}
-            onClick={() => data?.onEditRelationship?.()}
-          >
-            {formatTypeLabel(type === 'partner' ? 'partner' : 'child', data?.rel_type)}
-          </button>
+      {typeLabel ? (
+        <EdgeLabelRenderer>
           <div
-            className="rerooted-edge-meta"
-            style={{ opacity: hovered ? 1 : 0, transform: `translateY(${hovered ? '0px' : '4px'})` }}
+            style={{
+              position: 'absolute',
+              left: labelX,
+              top: labelY,
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'all',
+              textAlign: 'center',
+            }}
           >
-            {period ? `${period} · Bearbeiten` : 'Bearbeiten'}
+            <button
+              type="button"
+              className="rerooted-edge-label rerooted-edge-label-button"
+              style={{ opacity: hovered ? 1 : 0.85 }}
+              onClick={() => data?.onEditRelationship?.()}
+            >
+              {typeLabel}
+            </button>
+            <div
+              className="rerooted-edge-meta"
+              style={{ opacity: hovered ? 1 : 0, transform: `translateY(${hovered ? '0px' : '4px'})` }}
+            >
+              {period ? `${period} · Bearbeiten` : 'Bearbeiten'}
+            </div>
           </div>
-        </div>
-      </EdgeLabelRenderer>
+        </EdgeLabelRenderer>
+      ) : null}
     </>
   );
 });

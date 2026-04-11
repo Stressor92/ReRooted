@@ -7,6 +7,7 @@ import type { TreeData, TreeNode } from '../api/tree';
 export type CreatePersonInput = {
   first_name: string;
   last_name: string;
+  gender?: PersonSummary['gender'];
   birth_year?: string | null;
   is_living?: boolean | null;
 };
@@ -21,10 +22,12 @@ export function buildTempNode(
     id: string;
     first_name: string;
     last_name: string;
+    gender?: PersonSummary['gender'];
     is_living?: boolean | null;
     birth_year?: string | null;
     profile_image_url?: string | null;
     description_excerpt?: string | null;
+    generation?: number;
   },
   position: { x: number; y: number } = { x: 0, y: 0 },
 ): TreeNode {
@@ -35,6 +38,8 @@ export function buildTempNode(
     data: {
       first_name: person.first_name,
       last_name: person.last_name,
+      gender: person.gender ?? null,
+      generation: person.generation ?? 0,
       is_living: person.is_living ?? null,
       birth_year: person.birth_year ?? null,
       death_year: null,
@@ -73,8 +78,10 @@ export function useCreatePerson() {
             id: tempId,
             first_name: newPerson.first_name,
             last_name: newPerson.last_name,
+            gender: newPerson.gender ?? null,
             is_living: newPerson.is_living ?? null,
             birth_year: newPerson.birth_year ?? null,
+            generation: 0,
           }),
         ],
         edges: current?.edges ?? [],
@@ -97,9 +104,11 @@ export function useCreatePerson() {
                   id: result.person.id,
                   first_name: result.person.first_name,
                   last_name: result.person.last_name,
+                  gender: result.person.gender ?? null,
                   is_living: result.person.is_living,
                   birth_year: result.birth_year,
                   profile_image_url: result.person.profile_image_url,
+                  generation: 0,
                 }, node.position)
               : node,
           ) ?? [],

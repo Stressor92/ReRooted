@@ -113,3 +113,26 @@ def test_list_relationships_for_child_includes_parent_family(test_client) -> Non
     assert payload[0]["child_ids"] == [child]
     assert payload[0]["person1_id"] == parent_one
     assert payload[0]["person2_id"] == parent_two
+
+
+def test_can_create_sibling_relationship_without_known_parents(test_client) -> None:
+    suffix = uuid4().hex[:8]
+    sibling_one = _create_person(test_client, f"Alex{suffix}", f"Stone{suffix}")
+    sibling_two = _create_person(test_client, f"Jamie{suffix}", f"Stone{suffix}")
+
+    response = test_client.post(
+        "/relationships",
+        json={
+            "person1_id": sibling_one,
+            "person2_id": sibling_two,
+            "rel_type": "sibling",
+            "child_ids": [],
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["rel_type"] == "sibling"
+    assert payload["person1_id"] == sibling_one
+    assert payload["person2_id"] == sibling_two
+    assert payload["child_ids"] == []

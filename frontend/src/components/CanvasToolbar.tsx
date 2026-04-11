@@ -5,6 +5,7 @@ import { useReactFlow, useStore } from '@xyflow/react';
 import { useCsvExport } from '../hooks/useCsvExport';
 import { useGedcomExport } from '../hooks/useGedcom';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useTemplate } from '../hooks/useTemplate';
 import CanvasSearch from './CanvasSearch';
 import BackgroundPicker from './BackgroundPicker';
 import ExportPicker from './ExportPicker';
@@ -37,6 +38,8 @@ export default function CanvasToolbar({
   const zoom = useStore((store) => store.transform[2] ?? 1);
   const gedcomExport = useGedcomExport();
   const csvExport = useCsvExport();
+  const showPersonas = useTemplate((state) => state.showPersonas);
+  const setShowPersonas = useTemplate((state) => state.setShowPersonas);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -95,20 +98,6 @@ export default function CanvasToolbar({
         </div>
 
         <div className="rerooted-toolbar-group">
-          <button
-            type="button"
-            className={`rerooted-toolbar-button${layoutDir === 'TB' ? ' is-active' : ''}`}
-            onClick={() => onChangeLayoutDir('TB')}
-          >
-            ↕ TB
-          </button>
-          <button
-            type="button"
-            className={`rerooted-toolbar-button${layoutDir === 'LR' ? ' is-active' : ''}`}
-            onClick={() => onChangeLayoutDir('LR')}
-          >
-            ↔ LR
-          </button>
           <button type="button" className="rerooted-toolbar-button" onClick={onRelayout} title="Neu anordnen">
             ⟳
           </button>
@@ -117,6 +106,14 @@ export default function CanvasToolbar({
         <div className="rerooted-toolbar-group">
           <TemplatePicker />
           <BackgroundPicker />
+          <button
+            type="button"
+            className={`rerooted-toolbar-button${showPersonas ? ' is-active' : ''}`}
+            onClick={() => setShowPersonas(!showPersonas)}
+            title="Dummy-Portraits ein- oder ausblenden"
+          >
+            Personas: {showPersonas ? 'An' : 'Aus'}
+          </button>
         </div>
       </div>
 

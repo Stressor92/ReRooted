@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Junger erwachsener männlich Avatar">
+  <rect width="200" height="200" rx="32" fill="#dff5ea"/>
+  <circle cx="100" cy="106" r="54" fill="#edc49e"/>
+  <path d="M51 96c4-34 22-57 49-57 34 0 51 26 50 62-15-12-31-18-51-18-20 0-34 4-48 13z" fill="#3d281d"/>
+  <circle cx="80" cy="108" r="5" fill="#2f2f2f"/>
+  <circle cx="120" cy="108" r="5" fill="#2f2f2f"/>
+  <path d="M86 128c10 6 20 6 28 0" fill="none" stroke="#985b45" stroke-width="4" stroke-linecap="round"/>
+  <path d="M56 179c8-26 25-40 44-40 18 0 34 12 44 40" fill="#4bb58b"/>
+</svg>

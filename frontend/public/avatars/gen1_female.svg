@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Junge erwachsene weiblich Avatar">
+  <rect width="200" height="200" rx="32" fill="#fde8d8"/>
+  <circle cx="100" cy="110" r="54" fill="#f1c7a6"/>
+  <path d="M47 100c2-41 21-63 53-63 32 0 50 22 53 65-15-16-28-22-52-22-21 0-38 8-54 20z" fill="#6b4438"/>
+  <circle cx="80" cy="110" r="5" fill="#2f2f2f"/>
+  <circle cx="120" cy="110" r="5" fill="#2f2f2f"/>
+  <path d="M84 129c11 8 22 8 32 0" fill="none" stroke="#a76054" stroke-width="4" stroke-linecap="round"/>
+  <path d="M58 178c9-27 24-40 42-40 20 0 34 14 42 40" fill="#e98f67"/>
+</svg>

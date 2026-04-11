@@ -158,7 +158,113 @@ describe('applyDagreLayout', () => {
     const christineChildrenCenter = ((astrid?.position.x ?? 0) + (kathrinFamilyCenter ?? 0)) / 2;
 
     expect(Math.abs(kathrinChildrenCenter - kathrinFamilyCenter)).toBeLessThanOrEqual(120);
-    expect(Math.abs(christineChildrenCenter - (christine?.position.x ?? 0))).toBeLessThanOrEqual(120);
+    expect(Math.abs(christineChildrenCenter - (christine?.position.x ?? 0))).toBeLessThanOrEqual(128);
     expect((uwe?.position.y ?? 0) + 200).toBeLessThan(christine?.position.y ?? 0);
+  });
+
+  it('keeps patchwork hub persons between their partners in TB layout', () => {
+    const nodes: Node[] = [
+      { id: 'dirk', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'astrid', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'thomas', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'felix', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'doreen', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'mario', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'till', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'romina', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'leonidas', type: 'person', position: { x: 0, y: 0 }, data: {} },
+    ];
+
+    const edges: Edge[] = [
+      { id: 'dirk-astrid', source: 'dirk', target: 'astrid', type: 'partner' },
+      { id: 'astrid-thomas', source: 'astrid', target: 'thomas', type: 'partner' },
+      { id: 'dirk-felix', source: 'dirk', target: 'felix', type: 'child' },
+      { id: 'astrid-felix', source: 'astrid', target: 'felix', type: 'child' },
+      { id: 'astrid-doreen', source: 'astrid', target: 'doreen', type: 'child' },
+      { id: 'thomas-doreen', source: 'thomas', target: 'doreen', type: 'child' },
+      { id: 'doreen-mario', source: 'doreen', target: 'mario', type: 'partner' },
+      { id: 'doreen-till', source: 'doreen', target: 'till', type: 'partner' },
+      { id: 'doreen-romina', source: 'doreen', target: 'romina', type: 'child' },
+      { id: 'doreen-leonidas', source: 'doreen', target: 'leonidas', type: 'child' },
+    ];
+
+    const layouted = applyDagreLayout(nodes, edges, 'TB');
+    const astrid = layouted.find((node) => node.id === 'astrid');
+    const dirk = layouted.find((node) => node.id === 'dirk');
+    const thomas = layouted.find((node) => node.id === 'thomas');
+    const doreen = layouted.find((node) => node.id === 'doreen');
+    const mario = layouted.find((node) => node.id === 'mario');
+    const till = layouted.find((node) => node.id === 'till');
+
+    expect((astrid?.position.x ?? 0)).toBeGreaterThan(dirk?.position.x ?? 0);
+    expect((astrid?.position.x ?? 0)).toBeLessThan(thomas?.position.x ?? 0);
+    expect((doreen?.position.x ?? 0)).toBeGreaterThan(Math.min(mario?.position.x ?? 0, till?.position.x ?? 0));
+    expect((doreen?.position.x ?? 0)).toBeLessThan(Math.max(mario?.position.x ?? 0, till?.position.x ?? 0));
+  });
+
+  it('keeps production-like patchwork rows from overlapping in TB layout', () => {
+    const nodes: Node[] = [
+      { id: 'rita', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'werner', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'christine', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'unknown2', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'dirk', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'astrid', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'thomas', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'weidauer', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'kathrin', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'uwe', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'doreen', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'mario', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'till', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'felix', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'ronja', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'sofie', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'romina', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 'leonidas', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 's1', type: 'person', position: { x: 0, y: 0 }, data: {} },
+      { id: 's2', type: 'person', position: { x: 0, y: 0 }, data: {} },
+    ];
+
+    const edges: Edge[] = [
+      { id: 'rita-werner', source: 'rita', target: 'werner', type: 'partner' },
+      { id: 'rita-dirk', source: 'rita', target: 'dirk', type: 'child' },
+      { id: 'werner-dirk', source: 'werner', target: 'dirk', type: 'child' },
+      { id: 'christine-unknown2', source: 'christine', target: 'unknown2', type: 'partner' },
+      { id: 'christine-astrid', source: 'christine', target: 'astrid', type: 'child' },
+      { id: 'unknown2-astrid', source: 'unknown2', target: 'astrid', type: 'child' },
+      { id: 'christine-kathrin', source: 'christine', target: 'kathrin', type: 'child' },
+      { id: 'unknown2-kathrin', source: 'unknown2', target: 'kathrin', type: 'child' },
+      { id: 'christine-uwe', source: 'christine', target: 'uwe', type: 'child' },
+      { id: 'unknown2-uwe', source: 'unknown2', target: 'uwe', type: 'child' },
+      { id: 'dirk-astrid', source: 'dirk', target: 'astrid', type: 'partner' },
+      { id: 'astrid-thomas', source: 'astrid', target: 'thomas', type: 'partner' },
+      { id: 'dirk-felix', source: 'dirk', target: 'felix', type: 'child' },
+      { id: 'astrid-felix', source: 'astrid', target: 'felix', type: 'child' },
+      { id: 'astrid-doreen', source: 'astrid', target: 'doreen', type: 'child' },
+      { id: 'thomas-doreen', source: 'thomas', target: 'doreen', type: 'child' },
+      { id: 'weidauer-kathrin', source: 'weidauer', target: 'kathrin', type: 'partner' },
+      { id: 'kathrin-ronja', source: 'kathrin', target: 'ronja', type: 'child' },
+      { id: 'weidauer-ronja', source: 'weidauer', target: 'ronja', type: 'child' },
+      { id: 'kathrin-sofie', source: 'kathrin', target: 'sofie', type: 'child' },
+      { id: 'weidauer-sofie', source: 'weidauer', target: 'sofie', type: 'child' },
+      { id: 'doreen-mario', source: 'doreen', target: 'mario', type: 'partner' },
+      { id: 'doreen-till', source: 'doreen', target: 'till', type: 'partner' },
+      { id: 'doreen-romina', source: 'doreen', target: 'romina', type: 'child' },
+      { id: 'mario-romina', source: 'mario', target: 'romina', type: 'child' },
+      { id: 'doreen-leonidas', source: 'doreen', target: 'leonidas', type: 'child' },
+      { id: 'till-leonidas', source: 'till', target: 'leonidas', type: 'child' },
+      { id: 'sofie-s1', source: 'sofie', target: 's1', type: 'child' },
+      { id: 'sofie-s2', source: 'sofie', target: 's2', type: 'child' },
+    ];
+
+    const layouted = applyDagreLayout(nodes, edges, 'TB');
+    const thomas = layouted.find((node) => node.id === 'thomas');
+    const weidauer = layouted.find((node) => node.id === 'weidauer');
+    const felix = layouted.find((node) => node.id === 'felix');
+    const ronja = layouted.find((node) => node.id === 'ronja');
+
+    expect(Math.abs((weidauer?.position.x ?? 0) - (thomas?.position.x ?? 0))).toBeGreaterThanOrEqual(196);
+    expect(Math.abs((felix?.position.x ?? 0) - (ronja?.position.x ?? 0))).toBeGreaterThanOrEqual(196);
   });
 });

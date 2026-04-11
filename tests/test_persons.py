@@ -18,6 +18,7 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
         json={
             "first_name": f"Anna{suffix}",
             "last_name": f"Zimmer{suffix}",
+            "gender": "female",
             "birth_place_id": place_id,
             "description": "Created by API test",
             "current_address": "Musterstraße 12, Berlin",
@@ -32,6 +33,7 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
     assert created["first_name"] == f"Anna{suffix}"
     assert created["last_name"] == f"Zimmer{suffix}"
     assert created["birth_place_id"] == place_id
+    assert created["gender"] == "female"
     assert created["current_address"] == "Musterstraße 12, Berlin"
     assert created["phone_number"] == "+49 30 123456"
     assert created["profile_image_url"] is None
@@ -46,6 +48,7 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
     assert detail_response.status_code == 200
     detail = detail_response.json()
     assert detail["id"] == person_id
+    assert detail["gender"] == "female"
     assert detail["events"] == []
     assert detail["birth_place"]["id"] == place_id
 
@@ -53,6 +56,7 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
         f"/persons/{person_id}",
         json={
             "last_name": f"Schmidt{suffix}",
+            "gender": "male",
             "description": "Updated description",
             "current_address": "Neue Anschrift 5, Hamburg",
             "phone_number": "+49 40 987654",
@@ -61,6 +65,7 @@ def test_person_crud_roundtrip_and_search(test_client) -> None:
     assert update_response.status_code == 200
     updated = update_response.json()
     assert updated["last_name"] == f"Schmidt{suffix}"
+    assert updated["gender"] == "male"
     assert updated["description"] == "Updated description"
     assert updated["current_address"] == "Neue Anschrift 5, Hamburg"
     assert updated["phone_number"] == "+49 40 987654"

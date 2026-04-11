@@ -7,7 +7,7 @@ import { useToastStore } from './useToast';
 type PersonUpdatePayload = Partial<
   Pick<
     PersonSummary,
-    'first_name' | 'last_name' | 'is_living' | 'birth_place_id' | 'description' | 'current_address' | 'phone_number' | 'gramps_id'
+    'first_name' | 'last_name' | 'gender' | 'is_living' | 'birth_place_id' | 'description' | 'current_address' | 'phone_number' | 'gramps_id'
   >
 > & {
   profile_image_id?: string | null;

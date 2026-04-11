@@ -6,6 +6,7 @@ import { applyTemplate, type BackgroundType, type DesignTemplate } from '../desi
 
 const TEMPLATE_STORAGE_KEY = 'rerooted_active_template';
 const BACKGROUND_STORAGE_KEY = 'rerooted_background_type';
+const PERSONAS_STORAGE_KEY = 'rerooted_show_personas';
 
 function isBackgroundType(value: string | null): value is BackgroundType {
   return value === 'dots'
@@ -48,7 +49,27 @@ function resolveInitialBackground(template: DesignTemplate): BackgroundType {
   }
 }
 
-function persistSelection(template: DesignTemplate, backgroundType: BackgroundType): void {
+function resolveInitialShowPersonas(): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  try {
+    return window.localStorage.getItem(PERSONAS_STORAGE_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+function applyPersonasSetting(showPersonas: boolean): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.documentElement.dataset.personas = showPersonas ? 'on' : 'off';
+}
+
+function persistSelection(template: DesignTemplate, backgroundType: BackgroundType, showPersonas: boolean): void {
   if (typeof window === 'undefined') {
     return;
   }
@@ -56,6 +77,7 @@ function persistSelection(template: DesignTemplate, backgroundType: BackgroundTy
   try {
     window.localStorage.setItem(TEMPLATE_STORAGE_KEY, template.id);
     window.localStorage.setItem(BACKGROUND_STORAGE_KEY, backgroundType);
+    window.localStorage.setItem(PERSONAS_STORAGE_KEY, showPersonas ? 'on' : 'off');
   } catch {
     // Ignore storage write errors in private modes or restricted environments.
   }
@@ -63,29 +85,42 @@ function persistSelection(template: DesignTemplate, backgroundType: BackgroundTy
 
 const initialTemplate = resolveInitialTemplate();
 const initialBackground = resolveInitialBackground(initialTemplate);
+const initialShowPersonas = resolveInitialShowPersonas();
 
 if (typeof document !== 'undefined') {
   applyTemplate(initialTemplate);
+  applyPersonasSetting(initialShowPersonas);
 }
 
 type TemplateStore = {
   activeTemplate: DesignTemplate;
   backgroundType: BackgroundType;
+  showPersonas: boolean;
   setTemplate: (template: DesignTemplate) => void;
   setBackgroundType: (backgroundType: BackgroundType) => void;
+  setShowPersonas: (showPersonas: boolean) => void;
 };
 
 export const useTemplate = create<TemplateStore>((set, get) => ({
   activeTemplate: initialTemplate,
   backgroundType: initialBackground,
+  showPersonas: initialShowPersonas,
   setTemplate: (template) => {
+    const { showPersonas } = get();
     applyTemplate(template);
-    persistSelection(template, template.canvas.backgroundType);
+    applyPersonasSetting(showPersonas);
+    persistSelection(template, template.canvas.backgroundType, showPersonas);
     set({ activeTemplate: template, backgroundType: template.canvas.backgroundType });
   },
   setBackgroundType: (backgroundType) => {
-    const { activeTemplate } = get();
-    persistSelection(activeTemplate, backgroundType);
+    const { activeTemplate, showPersonas } = get();
+    persistSelection(activeTemplate, backgroundType, showPersonas);
     set({ backgroundType });
+  },
+  setShowPersonas: (showPersonas) => {
+    const { activeTemplate, backgroundType } = get();
+    applyPersonasSetting(showPersonas);
+    persistSelection(activeTemplate, backgroundType, showPersonas);
+    set({ showPersonas });
   },
 }));

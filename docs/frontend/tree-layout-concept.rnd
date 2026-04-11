@@ -1,0 +1,403 @@
+# Technische Erklärung: Anordnung der Personenkacheln im Stammbaum
+
+## Überblick
+
+Die aktuelle Stammbaumdarstellung in ReRooted basiert auf einem zweistufigen Konzept:
+
+1. **Backend** erzeugt aus Personen und Beziehungen eine Graph-Struktur aus `nodes` und `edges`.
+2. **Frontend** berechnet daraus mit `Dagre` plus eigener Nachbearbeitung das sichtbare Layout.
+
+Dabei gilt aktuell:
+- **Personen** werden als `person`-Knoten dargestellt
+- **Partnerschaften / Ex-Partnerschaften** werden als `partner`-Kanten dargestellt
+- **Eltern-Kind-Verbindungen** werden als `child`-Kanten dargestellt
+
+---
+
+## 1. Datenaufbereitung im Backend
+
+Datei: `backend/app/services/tree_service.py`
+
+Die zentrale Funktion ist:
+
+```python
+def build_tree(db: Session) -> dict[str, list[dict[str, Any]]]:
+    persons = db.query(Person).options(joinedload(Person.images)).all()
+    events = db.query(Event).filter(Event.event_type.in_([EventType.BIRTH, EventType.DEATH])).all()
+    relationships = db.query(Relationship).options(joinedload(Relationship.children)).all()
+
+    if not persons:
+        return {"nodes": [], "edges": []}
+
+    birth_map = _event_map(events, EventType.BIRTH)
+    death_map = _event_map(events, EventType.DEATH)
+
+    nodes = [_person_node(person, birth_map, death_map) for person in persons]
+    edges = _relationship_edges(relationships)
+    edges.extend(_child_edges(relationships))
+
+    return {"nodes": nodes, "edges": edges}
+```
+
+### Personen werden zu Nodes
+
+```python
+return {
+    "id": person_id,
+    "type": "person",
+    "position": {"x": 0, "y": 0},
+    "data": {
+        "first_name": str(person.first_name),
+        "last_name": str(person.last_name),
+        "birth_year": _year_label(birth_map.get(person_id)),
+        "death_year": _year_label(death_map.get(person_id)),
+    },
+}
+```
+
+### Beziehungen werden zu Edges
+
+**Partnerschaft / Ex-Partnerschaft**
+
+```python
+{
+    "id": f"partner-{rel.id}",
+    "source": str(rel.person1_id),
+    "target": str(rel.person2_id),
+    "type": "partner",
+}
+```
+
+**Eltern-Kind-Beziehung**
+
+```python
+{
+    "id": f"child-{rel.id}-{parent_id}-{child_id}",
+    "source": parent_id,
+    "target": child_id,
+    "type": "child",
+}
+```
+
+---
+
+## 2. Übergabe ins Frontend
+
+Datei: `frontend/src/features/tree/TreePage.tsx`
+
+Die geladenen Baumdaten werden in React-Flow-kompatible Elemente umgewandelt.
+
+### Nodes mit Ankerpunkten je nach Layout
+
+```tsx
+function toFlowNodes(tree: TreeData, layoutDir: 'TB' | 'LR'): FlowNode[] {
+  const sourcePosition = layoutDir === 'LR' ? Position.Right : Position.Bottom;
+  const targetPosition = layoutDir === 'LR' ? Position.Left : Position.Top;
+
+  return tree.nodes.map((node) => ({
+    ...node,
+    draggable: false,
+    sourcePosition,
+    targetPosition,
+  }));
+}
+```
+
+- `TB` = Top-Bottom
+- `LR` = Left-Right
+
+### Edges mit den richtigen Handles
+
+```tsx
+function toFlowEdges(tree: TreeData, layoutDir: 'TB' | 'LR'): FlowEdge[] {
+  return tree.edges.map((edge) => ({
+    ...edge,
+    ...getHandleIdsForRelationshipEdge(edge.type, layoutDir),
+    animated: false,
+  }));
+}
+```
+
+Danach wird das Layout berechnet:
+
+```tsx
+const layoutedNodes = useMemo(
+  () => applyDagreLayout(flowNodes, flowEdges, layoutDir) as FlowNode[],
+  [flowNodes, flowEdges, layoutDir, layoutVersion],
+);
+```
+
+---
+
+## 3. Layoutberechnung im Frontend
+
+Datei: `frontend/src/features/tree/useLayout.ts`
+
+Die Funktion `applyDagreLayout()` ist das Zentrum der Anordnung.
+
+```ts
+export function applyDagreLayout(
+  nodes: Node[],
+  edges: Edge[],
+  dir: 'TB' | 'LR' = 'TB',
+): Node[] {
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({
+    rankdir: dir,
+    ranksep: dir === 'TB' ? TB_RANK_GAP : 88,
+    nodesep: dir === 'TB' ? 84 : 52,
+    edgesep: 24,
+    marginx: 28,
+    marginy: 28,
+  });
+```
+
+### Ablauf
+
+1. `Dagre` berechnet ein Grundlayout.
+2. Im `TB`-Layout wird danach manuell nachkorrigiert.
+3. Generationen, Partnergruppen und Familienzweige werden ausgerichtet.
+4. Überlappungen in derselben Zeile werden reduziert.
+
+---
+
+## 4. Partnergruppen
+
+Damit Partner nebeneinander bleiben, werden sie zuerst gruppiert.
+
+```ts
+function buildPartnerGroupMap(nodes: Node[], edges: Edge[]): Map<NodeId, NodeId> {
+  const parent = new Map<NodeId, NodeId>(nodes.map((node) => [node.id, node.id]));
+
+  for (const edge of edges) {
+    if (edge.type === 'partner') {
+      union(edge.source, edge.target);
+    }
+  }
+
+  return new Map(nodes.map((node) => [node.id, find(node.id)]));
+}
+```
+
+### Ziel
+- Partner / Expartner werden als gemeinsame Einheit behandelt
+- sie bleiben auf derselben Ebene
+- Kinder können visuell unter diesem Block angeordnet werden
+
+---
+
+## 5. Generationslogik
+
+Die Generationen werden nicht nur aus direkten Kanten gelesen, sondern gruppenweise berechnet.
+
+```ts
+function buildGenerationMap(nodes: Node[], edges: Edge[]): Map<NodeId, number> {
+  const baseGroupMap = buildPartnerGroupMap(nodes, edges);
+  ...
+}
+```
+
+Wichtige Idee:
+- Eltern desselben Kindes werden auf dieselbe Generationsebene gezogen
+- auch dann, wenn sie keine direkte Partnerkante haben
+
+Danach werden feste Höhenbänder vergeben:
+
+```ts
+function enforceGenerationBands(nodes: Node[], edges: Edge[]): Node[] {
+  const generationMap = buildGenerationMap(nodes, edges);
+  const minY = Math.min(...nodes.map((node) => node.position.y));
+
+  return nodes.map((node) => ({
+    ...node,
+    position: {
+      ...node.position,
+      y: minY + (generationMap.get(node.id) ?? 0) * (NODE_H + TB_RANK_GAP),
+    },
+  }));
+}
+```
+
+### Ergebnis
+- Großeltern oben
+- Eltern mittig
+- Kinder unten
+- klare vertikale Generationstrennung
+
+---
+
+## 6. Partner im TB-Layout nebeneinander
+
+```ts
+function alignPartnersForTopBottom(nodes: Node[], edges: Edge[]): Node[] {
+  ...
+  const minDistance = NODE_W + PARTNER_GAP;
+  const currentDistance = rightNode.position.x - leftNode.position.x;
+
+  if (currentDistance < minDistance) {
+    const centerX = (leftNode.position.x + rightNode.position.x) / 2;
+    leftNode.position.x = Math.round(centerX - minDistance / 2);
+    rightNode.position.x = Math.round(centerX + minDistance / 2);
+  }
+}
+```
+
+### Ziel
+- Partner stehen rechts/links auf derselben Höhe
+- sie überlappen nicht
+- der gemeinsame Familienblock bleibt lesbar
+
+---
+
+## 7. Zentrierung von Eltern über Kindern
+
+Neuere Logik in:
+
+```ts
+function centerParentGroupsOverChildren(nodes: Node[], edges: Edge[]): Node[] {
+  ...
+}
+```
+
+Dabei wird geprüft:
+- Wo liegt die Mitte eines Elternblocks?
+- Wo liegt die Mitte der zugehörigen Kindzweige?
+- Müssen Eltern oder ganze Kindzweige horizontal verschoben werden?
+
+### Zentrale Berechnung
+
+```ts
+const parentCenter = getGroupCenter(groupId);
+const childrenCenter = childGroups.reduce((sum, childGroup) => sum + getGroupCenter(childGroup), 0) / childGroups.length;
+const delta = Math.round(parentCenter - childrenCenter);
+```
+
+Bei mehreren Kindzweigen wird die gesamte Nachfahrenstruktur verschoben:
+
+```ts
+if (childGroups.length > 1) {
+  const branchGroups = new Set<NodeId>();
+  for (const childGroup of childGroups) {
+    collectBranchGroups(childGroup, branchGroups);
+  }
+  shiftGroups(branchGroups, delta);
+}
+```
+
+### Nutzen
+- Eltern stehen visueller über ihren Kindern
+- Zweige wie `Christine -> Kathrin/Astrid` driften weniger auseinander
+- unnötige Überschneidungen werden reduziert
+
+---
+
+## 8. Entflechtung innerhalb derselben Reihe
+
+Damit Personen derselben Generation nicht übereinander oder zu dicht liegen, wird am Ende noch einmal pro Reihe entzerrt:
+
+```ts
+function spreadGenerationRows(nodes: Node[], edges: Edge[]): Node[] {
+  ...
+  if (block.minX < nextMinX) {
+    const delta = nextMinX - block.minX;
+    for (const node of block.groupNodes) {
+      node.position.x += delta;
+    }
+  }
+}
+```
+
+### Ergebnis
+- gleich hohe Karten werden auseinandergezogen
+- Familienblöcke stoßen weniger ineinander
+- die Lesbarkeit verbessert sich
+
+---
+
+## 9. Darstellung der Personenkachel
+
+Datei: `frontend/src/features/tree/PersonNode.tsx`
+
+Die Kachel selbst enthält:
+- Namen
+- Lebensdaten
+- Foto oder Initialen
+- Statuspunkt
+- Verbindungs-Handles
+
+### Aktuelle Handles
+
+```tsx
+<Handle id={PERSON_PARENT_HANDLE_ID} type="target" position={targetPosition} />
+{showPartnerHandles ? <Handle id={PARTNER_LEFT_HANDLE_ID} type="target" position={Position.Left} /> : null}
+{showPartnerHandles ? <Handle id={PARTNER_RIGHT_HANDLE_ID} type="source" position={Position.Right} /> : null}
+<Handle id={PERSON_CHILD_HANDLE_ID} type="source" position={sourcePosition} />
+```
+
+### Bedeutung
+- **oben**: Eingang für Elternbeziehungen
+- **unten**: Ausgang zu Kindern
+- **links/rechts**: Partner-/Expartner-Verbindungen im TB-Layout
+
+---
+
+## 10. Darstellung der Beziehungslinien
+
+Datei: `frontend/src/features/tree/FamilyEdge.tsx`
+
+### Partnerlinien
+Im `TB`-Layout werden Partnerbeziehungen horizontal gezeichnet:
+
+```tsx
+const useHorizontalPartnerAnchors = isPartnerEdge && sourcePosition === 'bottom' && targetPosition === 'top';
+```
+
+Dann folgt eine gerade Verbindung:
+
+```tsx
+getStraightPath({
+  sourceX: partnerSourceX,
+  sourceY: partnerCenterY,
+  targetX: partnerTargetX,
+  targetY: partnerCenterY,
+})
+```
+
+### Kindlinien
+Für Eltern-Kind-Verbindungen werden Bezier-Kurven genutzt:
+
+```tsx
+getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+```
+
+### Wirkung
+- Partner wirken wie auf derselben Ebene verbunden
+- Kinder hängen vertikal unter den Elternblöcken
+
+---
+
+## 11. Zusammenfassung des aktuellen Konzepts
+
+Das aktuelle Stammbaumlayout folgt diesem Prinzip:
+
+1. **Datenmodell** aus Backend laden
+2. **Nodes und Edges** erzeugen
+3. **Dagre** für das Groblayout verwenden
+4. **Generationen fixieren**
+5. **Partner horizontal gruppieren**
+6. **Eltern-Kind-Zweige zentrieren**
+7. **Reihen entzerren**, um Überlappungen zu verringern
+
+Kurz gesagt:
+
+> Die Personenkacheln werden aktuell als Graph angeordnet, zunächst automatisch mit Dagre und anschließend durch eigene Regeln für Generationen, Partnerblöcke und Familienzweige nachjustiert, damit der Stammbaum im TB-Layout lesbarer und genealogisch plausibler wirkt.
+
+---
+
+## Relevante Dateien
+
+- `backend/app/services/tree_service.py`
+- `frontend/src/features/tree/TreePage.tsx`
+- `frontend/src/features/tree/useLayout.ts`
+- `frontend/src/features/tree/PersonNode.tsx`
+- `frontend/src/features/tree/FamilyEdge.tsx`

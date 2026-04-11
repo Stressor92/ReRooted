@@ -6,7 +6,7 @@ import type { TreeData, TreeEdge } from '../api/tree';
 export type RelationshipCreateInput = {
   person1_id: string;
   person2_id?: string | null;
-  rel_type: 'partner' | 'ex' | 'adoption' | 'foster' | 'unknown';
+  rel_type: 'partner' | 'ex' | 'sibling' | 'adoption' | 'foster' | 'unknown';
   child_ids?: string[];
   start_date?: string | null;
   end_date?: string | null;
@@ -15,7 +15,7 @@ export type RelationshipCreateInput = {
 export type RelationshipUpdateInput = {
   person1_id?: string;
   person2_id?: string | null;
-  rel_type?: 'partner' | 'ex' | 'adoption' | 'foster' | 'unknown';
+  rel_type?: 'partner' | 'ex' | 'sibling' | 'adoption' | 'foster' | 'unknown';
   start_date?: string | null;
   end_date?: string | null;
 };

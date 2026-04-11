@@ -17,7 +17,11 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMous
 import { useNavigate } from 'react-router-dom';
 import { apiClient, getApiErrorMessage } from '../../api/client';
 import type { CreatePersonResult } from '../../hooks/useCreatePerson';
-import { useAddChild, useCreateRelationship } from '../../hooks/useRelationshipMutations';
+import {
+  useAddChild,
+  useCreateRelationship,
+  type RelationshipCreateInput,
+} from '../../hooks/useRelationshipMutations';
 import { useCanvasSearch } from '../../hooks/useCanvasSearch';
 import { useContextMenu } from '../../hooks/useContextMenu';
 import { useCustomDesign } from '../../hooks/useCustomDesign';
@@ -67,7 +71,7 @@ type RelationshipRecord = {
   id: string;
   person1_id: string;
   person2_id?: string | null;
-  rel_type: 'partner' | 'ex' | 'adoption' | 'foster' | 'unknown';
+  rel_type: 'partner' | 'ex' | 'sibling' | 'adoption' | 'foster' | 'unknown';
   start_date?: string | null;
   end_date?: string | null;
   child_ids: string[];
@@ -88,7 +92,7 @@ type MiniMapPersonNodeProps = {
 function relationshipTypeFromRelType(
   relType: RelationshipRecord['rel_type'],
   edgeType: FlowEdge['type'],
-): 'partner' | 'ex' | 'biological' | 'adoption' | 'foster' | 'unknown' {
+): 'partner' | 'ex' | 'sibling' | 'biological' | 'adoption' | 'foster' | 'unknown' {
   if (relType === 'partner' && edgeType === 'child') {
     return 'biological';
   }
@@ -150,12 +154,12 @@ function getRelationshipStateFromPreset(
     return null;
   }
 
-  if (preset.relationshipKind === 'partner') {
+  if (preset.relationshipKind === 'partner' || (preset.relationshipKind === 'sibling' && !preset.relationshipId)) {
     return {
       sourceNodeId: preset.sourceNodeId,
       targetNodeId: result.person.id,
       mode: 'partner',
-      preferredType: 'partner',
+      preferredType: preset.relationshipKind === 'sibling' ? 'sibling' : 'partner',
     };
   }
 
@@ -176,16 +180,22 @@ function getRelationshipStateFromPreset(
   };
 }
 
-function buildDefaultRelationshipFromPreset(result: CreatePersonResult, preset?: QuickAddPreset) {
-  if (!preset || preset.relationshipKind === 'sibling') {
+function buildDefaultRelationshipFromPreset(
+  result: CreatePersonResult,
+  preset?: QuickAddPreset,
+): RelationshipCreateInput | null {
+  if (!preset || (preset.relationshipKind === 'sibling' && preset.relationshipId)) {
     return null;
   }
 
-  if (preset.relationshipKind === 'partner') {
+  if (preset.relationshipKind === 'partner' || preset.relationshipKind === 'sibling') {
+    const relType: RelationshipCreateInput['rel_type'] =
+      preset.relationshipKind === 'sibling' ? 'sibling' : 'partner';
+
     return {
       person1_id: preset.sourceNodeId,
       person2_id: result.person.id,
-      rel_type: 'partner' as const,
+      rel_type: relType,
       child_ids: [],
     };
   }
@@ -384,21 +394,13 @@ export default function TreeCanvas({
         .then((response) => response.data as RelationshipRecord[]);
 
       const parentRelationship = relationships.find((relationship) => relationship.child_ids.includes(nodeId));
-      if (!parentRelationship) {
-        addToast({
-          type: 'info',
-          message: 'Für Geschwister bitte zuerst ein Elternverhältnis für diese Person anlegen.',
-        });
-        return;
-      }
-
       openQuickAdd({
         position: menu ? { x: menu.x, y: menu.y } : getCenteredQuickAddPosition(),
         preset: {
           sourceNodeId: nodeId,
           relationshipKind: 'sibling',
-          sourceHandleType: 'source',
-          relationshipId: parentRelationship.id,
+          sourceHandleType: parentRelationship ? 'source' : null,
+          relationshipId: parentRelationship?.id ?? null,
         },
       });
     },

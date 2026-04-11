@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Senior weiblich Avatar">
+  <rect width="200" height="200" rx="32" fill="#f3ebf7"/>
+  <circle cx="100" cy="110" r="54" fill="#ebc9af"/>
+  <path d="M46 100c4-40 22-62 54-62 31 0 49 24 52 65-14-14-28-20-50-20-22 0-38 7-56 17z" fill="#dbd5df"/>
+  <circle cx="80" cy="110" r="5" fill="#303030"/>
+  <circle cx="120" cy="110" r="5" fill="#303030"/>
+  <path d="M83 129c10 7 22 7 34 0" fill="none" stroke="#8b6275" stroke-width="4" stroke-linecap="round"/>
+  <path d="M73 121c1 4 4 6 7 6" fill="none" stroke="#8b6275" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M120 121c1 4 4 6 7 6" fill="none" stroke="#8b6275" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M58 178c8-26 24-38 42-38 18 0 33 11 42 38" fill="#af8fb8"/>
+</svg>

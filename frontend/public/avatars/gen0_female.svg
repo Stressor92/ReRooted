@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Teenager weiblich Avatar">
+  <rect width="200" height="200" rx="32" fill="#ffe0ef"/>
+  <circle cx="100" cy="110" r="54" fill="#f4cfb0"/>
+  <path d="M48 98c4-38 23-60 52-60 33 0 51 25 52 63-12-15-24-24-49-24-21 0-35 8-55 21z" fill="#5b3a2e"/>
+  <circle cx="80" cy="110" r="5" fill="#2e2e2e"/>
+  <circle cx="120" cy="110" r="5" fill="#2e2e2e"/>
+  <path d="M85 129c10 9 21 9 30 0" fill="none" stroke="#a35d70" stroke-width="4" stroke-linecap="round"/>
+  <path d="M58 178c8-28 24-40 42-40 19 0 34 13 42 40" fill="#ff8fb2"/>
+</svg>

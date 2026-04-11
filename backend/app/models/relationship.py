@@ -13,6 +13,7 @@ from app.core.database import Base
 class RelType(str, enum.Enum):
     PARTNER = "partner"
     EX = "ex"
+    SIBLING = "sibling"
     ADOPTION = "adoption"
     FOSTER = "foster"
     UNKNOWN = "unknown"

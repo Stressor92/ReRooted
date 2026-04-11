@@ -14,6 +14,7 @@ class Person(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
+    gender = Column(String, nullable=True)
     is_living = Column(Boolean, nullable=True)
     birth_place_id = Column(String, ForeignKey("places.id"), nullable=True)
     description = Column(String, nullable=True)

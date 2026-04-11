@@ -1,14 +1,16 @@
 import { Component, type ErrorInfo, type ReactNode, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { Position, ReactFlowProvider, type Edge, type Node } from '@xyflow/react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import type { EdgeData, PersonNodeData, TreeData } from '../../api/tree';
+import { usePersons } from '../../hooks/usePersons';
 import { useTree } from '../../hooks/useTree';
 import type { QuickAddState } from '../persons/forms/QuickAddPopover';
 import PersonPanel, { type PersonPanelTab } from '../persons/PersonPanel';
 import TreeCanvas from './TreeCanvas';
 import { getHandleIdsForRelationshipEdge } from './connectionHandles';
-import { applyDagreLayout } from './useLayout';
+import { applyDagreLayout, getGenerationMap } from './useLayout';
 
 type FlowNode = Node<PersonNodeData, 'person'>;
 type FlowEdge = Edge<EdgeData, 'partner' | 'child'>;
@@ -48,12 +50,21 @@ class TreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
   }
 }
 
-function toFlowNodes(tree: TreeData, layoutDir: 'TB' | 'LR'): FlowNode[] {
+function toFlowNodes(
+  tree: TreeData,
+  layoutDir: 'TB' | 'LR',
+  gendersById: Map<string, PersonNodeData['gender']>,
+): FlowNode[] {
   const sourcePosition = layoutDir === 'LR' ? Position.Right : Position.Bottom;
   const targetPosition = layoutDir === 'LR' ? Position.Left : Position.Top;
 
   return tree.nodes.map((node) => ({
     ...node,
+    data: {
+      ...node.data,
+      gender: gendersById.get(node.id) ?? node.data.gender ?? null,
+      generation: node.data.generation ?? 0,
+    },
     draggable: false,
     sourcePosition,
     targetPosition,
@@ -70,18 +81,32 @@ function toFlowEdges(tree: TreeData, layoutDir: 'TB' | 'LR'): FlowEdge[] {
 
 function TreePageContent() {
   const { data, isPending, error, refetch } = useTree();
+  const { data: persons = [] } = useQuery(usePersons());
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PersonPanelTab>('info');
   const [layoutDir, setLayoutDir] = useState<'TB' | 'LR'>('TB');
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [externalQuickAddState, setExternalQuickAddState] = useState<QuickAddState>(null);
 
-  const flowNodes = useMemo(() => (data ? toFlowNodes(data, layoutDir) : []), [data, layoutDir]);
-  const flowEdges = useMemo(() => (data ? toFlowEdges(data, layoutDir) : []), [data, layoutDir]);
-  const layoutedNodes = useMemo(
-    () => applyDagreLayout(flowNodes, flowEdges, layoutDir) as FlowNode[],
-    [flowNodes, flowEdges, layoutDir, layoutVersion],
+  const gendersById = useMemo(
+    () => new Map(persons.map((person) => [person.id, person.gender ?? null] as const)),
+    [persons],
   );
+  const flowNodes = useMemo(() => (data ? toFlowNodes(data, layoutDir, gendersById) : []), [data, layoutDir, gendersById]);
+  const flowEdges = useMemo(() => (data ? toFlowEdges(data, layoutDir) : []), [data, layoutDir]);
+  const layoutedNodes = useMemo(() => {
+    const positioned = applyDagreLayout(flowNodes, flowEdges, layoutDir) as FlowNode[];
+    const generationMap = getGenerationMap(flowNodes, flowEdges);
+    const maxGeneration = Math.max(0, ...generationMap.values());
+
+    return positioned.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        generation: Math.max(0, maxGeneration - (generationMap.get(node.id) ?? 0)),
+      },
+    }));
+  }, [flowNodes, flowEdges, layoutDir, layoutVersion]);
 
   if (isPending) {
     return <LoadingSpinner />;
@@ -143,7 +168,7 @@ function TreePageContent() {
                 preset: {
                   sourceNodeId: selectedPersonId,
                   relationshipKind: kind,
-                  sourceHandleType: kind === 'parent' ? 'target' : kind === 'partner' ? null : 'source',
+                  sourceHandleType: kind === 'parent' ? 'target' : kind === 'partner' || kind === 'sibling' ? null : 'source',
                 },
               });
             }}

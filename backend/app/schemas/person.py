@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.event import EventOut
 from app.schemas.place import PlaceOut
 
+PersonGender = Literal["male", "female"]
+
 
 class PersonCreate(BaseModel):
     first_name: str
     last_name: str
+    gender: PersonGender | None = None
     is_living: bool | None = None
     birth_place_id: str | None = None
     description: str | None = None
@@ -20,6 +25,7 @@ class PersonCreate(BaseModel):
 class PersonUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
+    gender: PersonGender | None = None
     is_living: bool | None = None
     birth_place_id: str | None = None
     description: str | None = None
@@ -57,6 +63,7 @@ class PersonOut(BaseModel):
     id: str
     first_name: str
     last_name: str
+    gender: PersonGender | None = None
     is_living: bool | None = None
     birth_place_id: str | None = None
     description: str | None = None

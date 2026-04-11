@@ -50,7 +50,7 @@ function buildPayload(
 ): RelationshipCreateInput {
   const normalisedType = relType === 'biological' ? 'partner' : relType;
 
-  if (relType === 'partner' || relType === 'ex') {
+  if (relType === 'partner' || relType === 'ex' || relType === 'sibling') {
     return {
       person1_id: state.sourceNodeId,
       person2_id: state.targetNodeId,

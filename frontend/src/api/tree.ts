@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { apiClient } from './client';
+import type { PersonGender } from './persons';
 
 export interface PersonNodeData extends Record<string, unknown> {
   first_name: string;
@@ -9,6 +10,8 @@ export interface PersonNodeData extends Record<string, unknown> {
   death_year: string | null;
   profile_image_url: string | null;
   description_excerpt: string | null;
+  gender: PersonGender | null;
+  generation: number;
 }
 
 export interface EdgeData extends Record<string, unknown> {

@@ -1,8 +1,9 @@
-import { apiRequest } from "../api/client";
+import { apiRequest } from '../api/client';
+import type { PersonSummary } from '../api/persons';
 
 export function usePersons() {
   return {
-    queryKey: ["persons"] as const,
-    queryFn: () => apiRequest<Array<Record<string, unknown>>>("/persons"),
+    queryKey: ['persons'] as const,
+    queryFn: () => apiRequest<PersonSummary[]>('/persons'),
   };
 }

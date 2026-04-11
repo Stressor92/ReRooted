@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../api/client';
-import type { PersonDetail, PersonEvent } from '../../../api/persons';
+import type { PersonDetail, PersonEvent, PersonGender } from '../../../api/persons';
 import EventTimeline from '../../../components/EventTimeline';
 import FlexDateInput from '../../../components/FlexDateInput';
 import PlaceAutocomplete from '../../../components/PlaceAutocomplete';
@@ -14,6 +14,7 @@ type InfoTabProps = {
 type DraftState = {
   first_name: string;
   last_name: string;
+  gender: PersonGender | null;
   is_living: boolean | null;
   description: string;
   current_address: string;
@@ -53,6 +54,7 @@ function buildDraft(person: PersonDetail): DraftState {
   return {
     first_name: person.first_name,
     last_name: person.last_name,
+    gender: person.gender ?? null,
     is_living: person.is_living,
     description: person.description ?? '',
     current_address: person.current_address ?? '',
@@ -150,6 +152,9 @@ export default function InfoTab({ person }: InfoTabProps) {
     if (draft.last_name.trim() !== person.last_name) {
       personPayload.last_name = draft.last_name.trim() || person.last_name;
     }
+    if (draft.gender !== (person.gender ?? null)) {
+      personPayload.gender = draft.gender;
+    }
     if (draft.is_living !== person.is_living) {
       personPayload.is_living = draft.is_living;
     }
@@ -242,6 +247,47 @@ export default function InfoTab({ person }: InfoTabProps) {
           </label>
 
           <label className="rerooted-field">
+            <span>Geschlecht</span>
+            <select
+              className="rerooted-input"
+              value={draft.gender ?? ''}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  gender: event.target.value ? (event.target.value as PersonGender) : null,
+                }))
+              }
+            >
+              <option value="">Nicht angegeben</option>
+              <option value="male">männlich</option>
+              <option value="female">weiblich</option>
+            </select>
+          </label>
+
+          <label className="rerooted-field">
+            <span>Lebt / Verstorben</span>
+            <select
+              className="rerooted-input"
+              value={draft.is_living === null ? '' : draft.is_living ? 'living' : 'deceased'}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  is_living:
+                    event.target.value === 'living'
+                      ? true
+                      : event.target.value === 'deceased'
+                        ? false
+                        : null,
+                }))
+              }
+            >
+              <option value="">Unbekannt</option>
+              <option value="living">Lebt</option>
+              <option value="deceased">Verstorben</option>
+            </select>
+          </label>
+
+          <label className="rerooted-field">
             <span>Aktuelle Adresse</span>
             <input
               className="rerooted-input"
@@ -314,33 +360,6 @@ export default function InfoTab({ person }: InfoTabProps) {
               </label>
             </>
           ) : null}
-        </div>
-
-        <div className="rerooted-field">
-          <span>Lebt / Verstorben</span>
-          <div className="rerooted-toggle-group">
-            <button
-              type="button"
-              className={`rerooted-toggle-option${draft.is_living === null ? ' is-active' : ''}`}
-              onClick={() => setDraft((current) => ({ ...current, is_living: null }))}
-            >
-              ?
-            </button>
-            <button
-              type="button"
-              className={`rerooted-toggle-option${draft.is_living === true ? ' is-active' : ''}`}
-              onClick={() => setDraft((current) => ({ ...current, is_living: true }))}
-            >
-              ✓ Lebt
-            </button>
-            <button
-              type="button"
-              className={`rerooted-toggle-option${draft.is_living === false ? ' is-active' : ''}`}
-              onClick={() => setDraft((current) => ({ ...current, is_living: false }))}
-            >
-              † Verstorben
-            </button>
-          </div>
         </div>
 
         <label className="rerooted-field">

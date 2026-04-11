@@ -1,5 +1,7 @@
 import { apiClient } from './client';
 
+export type PersonGender = 'male' | 'female' | 'diverse';
+
 export interface PlaceSummary extends Record<string, unknown> {
   id: string;
   name: string;
@@ -37,6 +39,7 @@ export interface PersonSummary extends Record<string, unknown> {
   id: string;
   first_name: string;
   last_name: string;
+  gender?: PersonGender | null;
   is_living: boolean | null;
   birth_place_id?: string | null;
   description?: string | null;
