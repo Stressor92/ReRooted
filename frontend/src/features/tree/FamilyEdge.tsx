@@ -18,6 +18,9 @@ const EDGE_STYLES: Record<string, CSSProperties> = {
   unknown: { stroke: 'var(--edge-unknown)', strokeWidth: 1, strokeDasharray: '2 4' },
 };
 
+const NODE_W = 160;
+const NODE_H = 164;
+
 type FamilyFlowEdge = Edge<EdgeData, 'partner' | 'child'>;
 
 function resolveEdgeStyle(edgeType: 'partner' | 'child', relType?: string): CSSProperties {
@@ -40,7 +43,20 @@ function resolveEdgeStyle(edgeType: 'partner' | 'child', relType?: string): CSSP
   return edgeType === 'partner' ? EDGE_STYLES.marriage : EDGE_STYLES.biological;
 }
 
-function formatTypeLabel(relType?: string): string {
+function formatTypeLabel(edgeType: 'partner' | 'child', relType?: string): string {
+  if (edgeType === 'child') {
+    switch (relType) {
+      case 'adoption':
+        return 'Adoption';
+      case 'foster':
+        return 'Pflegekind';
+      case 'unknown':
+        return 'Unbekannt';
+      default:
+        return 'Biologisches Kind';
+    }
+  }
+
   switch (relType) {
     case 'partner':
       return 'Partner';
@@ -53,7 +69,7 @@ function formatTypeLabel(relType?: string): string {
     case 'unknown':
       return 'Unbekannt';
     default:
-      return 'Biologisch';
+      return 'Beziehung';
   }
 }
 
@@ -80,8 +96,21 @@ const FamilyEdge = memo(function FamilyEdge({
 }: EdgeProps<FamilyFlowEdge>) {
   const [hovered, setHovered] = useState(false);
 
-  const [edgePath, labelX, labelY] =
-    type === 'partner'
+  const isPartnerEdge = type === 'partner';
+  const useHorizontalPartnerAnchors = isPartnerEdge && sourcePosition === 'bottom' && targetPosition === 'top';
+  const sourceIsLeft = sourceX <= targetX;
+  const partnerSourceX = sourceIsLeft ? sourceX + NODE_W / 2 : sourceX - NODE_W / 2;
+  const partnerTargetX = sourceIsLeft ? targetX - NODE_W / 2 : targetX + NODE_W / 2;
+  const partnerCenterY = (sourceY + targetY) / 2;
+
+  const [edgePath, labelX, labelY] = useHorizontalPartnerAnchors
+    ? getStraightPath({
+        sourceX: partnerSourceX,
+        sourceY: partnerCenterY,
+        targetX: partnerTargetX,
+        targetY: partnerCenterY,
+      })
+    : isPartnerEdge
       ? getStraightPath({ sourceX, sourceY, targetX, targetY })
       : getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
 
@@ -118,7 +147,7 @@ const FamilyEdge = memo(function FamilyEdge({
             style={{ opacity: hovered ? 1 : 0.85 }}
             onClick={() => data?.onEditRelationship?.()}
           >
-            {formatTypeLabel(data?.rel_type)}
+            {formatTypeLabel(type === 'partner' ? 'partner' : 'child', data?.rel_type)}
           </button>
           <div
             className="rerooted-edge-meta"

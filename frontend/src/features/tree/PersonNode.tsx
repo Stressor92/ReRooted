@@ -3,6 +3,12 @@ import { motion } from 'framer-motion';
 import { memo } from 'react';
 import { resolveApiUrl } from '../../api/client';
 import type { PersonNodeData } from '../../api/tree';
+import {
+  PARTNER_LEFT_HANDLE_ID,
+  PARTNER_RIGHT_HANDLE_ID,
+  PERSON_CHILD_HANDLE_ID,
+  PERSON_PARENT_HANDLE_ID,
+} from './connectionHandles';
 
 type PersonFlowNode = Node<PersonNodeData, 'person'>;
 
@@ -53,6 +59,7 @@ const PersonNode = memo(function PersonNode({
   const width = mode === 'full' ? 160 : mode === 'compact' ? 120 : 64;
   const label = `${data.first_name} ${data.last_name}`.trim();
   const lifeDates = formatLifeDates(data.birth_year, data.death_year);
+  const showPartnerHandles = targetPosition === Position.Top && sourcePosition === Position.Bottom;
 
   return (
     <motion.div
@@ -67,7 +74,9 @@ const PersonNode = memo(function PersonNode({
       transition={{ type: 'spring', stiffness: 230, damping: 18, mass: 0.7 }}
       title={label}
     >
-      <Handle type="target" position={targetPosition} />
+      <Handle id={PERSON_PARENT_HANDLE_ID} type="target" position={targetPosition} />
+      {showPartnerHandles ? <Handle id={PARTNER_LEFT_HANDLE_ID} type="target" position={Position.Left} /> : null}
+      {showPartnerHandles ? <Handle id={PARTNER_RIGHT_HANDLE_ID} type="source" position={Position.Right} /> : null}
       <span className="rerooted-status-dot" style={{ background: getStatusColor(data.is_living) }} />
 
       {data.profile_image_url ? (
@@ -96,7 +105,7 @@ const PersonNode = memo(function PersonNode({
         </div>
       ) : null}
 
-      <Handle type="source" position={sourcePosition} />
+      <Handle id={PERSON_CHILD_HANDLE_ID} type="source" position={sourcePosition} />
     </motion.div>
   );
 });

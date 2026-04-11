@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMous
 import { useNavigate } from 'react-router-dom';
 import { apiClient, getApiErrorMessage } from '../../api/client';
 import type { CreatePersonResult } from '../../hooks/useCreatePerson';
-import { useAddChild } from '../../hooks/useRelationshipMutations';
+import { useAddChild, useCreateRelationship } from '../../hooks/useRelationshipMutations';
 import { useCanvasSearch } from '../../hooks/useCanvasSearch';
 import { useContextMenu } from '../../hooks/useContextMenu';
 import { useCustomDesign } from '../../hooks/useCustomDesign';
@@ -37,6 +37,7 @@ import RelationshipDialog, {
 } from '../persons/forms/RelationshipDialog';
 import FamilyEdge from './FamilyEdge';
 import PersonNode from './PersonNode';
+import { getQuickAddPresetFromHandle, isPartnerConnection } from './connectionHandles';
 
 const nodeTypes = { person: PersonNode };
 const edgeTypes = { partner: FamilyEdge, child: FamilyEdge };
@@ -59,7 +60,7 @@ type TreeCanvasProps = {
 type ConnectEndState = {
   isValid?: boolean | null;
   fromNode?: { id: string } | null;
-  fromHandle?: { type?: string | null } | null;
+  fromHandle?: { id?: string | null; type?: string | null } | null;
 };
 
 type RelationshipRecord = {
@@ -175,6 +176,37 @@ function getRelationshipStateFromPreset(
   };
 }
 
+function buildDefaultRelationshipFromPreset(result: CreatePersonResult, preset?: QuickAddPreset) {
+  if (!preset || preset.relationshipKind === 'sibling') {
+    return null;
+  }
+
+  if (preset.relationshipKind === 'partner') {
+    return {
+      person1_id: preset.sourceNodeId,
+      person2_id: result.person.id,
+      rel_type: 'partner' as const,
+      child_ids: [],
+    };
+  }
+
+  if (preset.relationshipKind === 'parent') {
+    return {
+      person1_id: result.person.id,
+      person2_id: null,
+      rel_type: 'partner' as const,
+      child_ids: [preset.sourceNodeId],
+    };
+  }
+
+  return {
+    person1_id: preset.sourceNodeId,
+    person2_id: null,
+    rel_type: 'partner' as const,
+    child_ids: [result.person.id],
+  };
+}
+
 export default function TreeCanvas({
   nodes,
   edges,
@@ -192,6 +224,7 @@ export default function TreeCanvas({
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const addChild = useAddChild();
+  const createRelationship = useCreateRelationship();
   const backgroundType = useTemplate((state) => state.backgroundType);
   const showCustomPanel = useCustomDesign((state) => state.showPanel);
   const [quickAddState, setQuickAddState] = useState<QuickAddState>(null);
@@ -316,24 +349,27 @@ export default function TreeCanvas({
       return;
     }
 
+    const partnerConnection = isPartnerConnection(connection);
+
     setRelationshipState({
       sourceNodeId: connection.source,
       targetNodeId: connection.target,
-      mode: 'child',
-      preferredType: 'biological',
+      mode: partnerConnection ? 'partner' : 'child',
+      preferredType: partnerConnection ? 'partner' : 'biological',
     });
   }, []);
 
   const handleConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent, connectionState: ConnectEndState) => {
       if (!connectionState.isValid && connectionState.fromNode) {
+        const preset = getQuickAddPresetFromHandle(connectionState.fromHandle);
+
         openQuickAdd({
           position: getPointerPosition(event),
           preset: {
             sourceNodeId: connectionState.fromNode.id,
-            sourceHandleType:
-              (connectionState.fromHandle?.type as 'source' | 'target' | null | undefined) ?? null,
-            relationshipKind: connectionState.fromHandle?.type === 'target' ? 'parent' : 'child',
+            sourceHandleType: preset.sourceHandleType,
+            relationshipKind: preset.relationshipKind,
           },
         });
       }
@@ -534,13 +570,22 @@ export default function TreeCanvas({
         onClose={() => setQuickAddState(null)}
         onCreated={(result, options) => {
           const nextRelationshipState = getRelationshipStateFromPreset(result, options.preset);
+          const defaultRelationship = buildDefaultRelationshipFromPreset(result, options.preset);
+
           if (options.openPanel || !options.preset) {
             onSelectPerson(result.person.id);
           }
+
           if (options.preset?.relationshipKind === 'sibling' && options.preset.relationshipId) {
             void addChild.mutateAsync({ relationshipId: options.preset.relationshipId, childId: result.person.id });
             return;
           }
+
+          if (options.preset && !options.openPanel && defaultRelationship) {
+            void createRelationship.mutateAsync(defaultRelationship);
+            return;
+          }
+
           if (nextRelationshipState) {
             setRelationshipState(nextRelationshipState);
           }

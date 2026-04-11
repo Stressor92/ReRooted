@@ -7,6 +7,7 @@ import { useTree } from '../../hooks/useTree';
 import type { QuickAddState } from '../persons/forms/QuickAddPopover';
 import PersonPanel, { type PersonPanelTab } from '../persons/PersonPanel';
 import TreeCanvas from './TreeCanvas';
+import { getHandleIdsForRelationshipEdge } from './connectionHandles';
 import { applyDagreLayout } from './useLayout';
 
 type FlowNode = Node<PersonNodeData, 'person'>;
@@ -59,9 +60,10 @@ function toFlowNodes(tree: TreeData, layoutDir: 'TB' | 'LR'): FlowNode[] {
   }));
 }
 
-function toFlowEdges(tree: TreeData): FlowEdge[] {
+function toFlowEdges(tree: TreeData, layoutDir: 'TB' | 'LR'): FlowEdge[] {
   return tree.edges.map((edge) => ({
     ...edge,
+    ...getHandleIdsForRelationshipEdge(edge.type, layoutDir),
     animated: false,
   }));
 }
@@ -75,7 +77,7 @@ function TreePageContent() {
   const [externalQuickAddState, setExternalQuickAddState] = useState<QuickAddState>(null);
 
   const flowNodes = useMemo(() => (data ? toFlowNodes(data, layoutDir) : []), [data, layoutDir]);
-  const flowEdges = useMemo(() => (data ? toFlowEdges(data) : []), [data]);
+  const flowEdges = useMemo(() => (data ? toFlowEdges(data, layoutDir) : []), [data, layoutDir]);
   const layoutedNodes = useMemo(
     () => applyDagreLayout(flowNodes, flowEdges, layoutDir) as FlowNode[],
     [flowNodes, flowEdges, layoutDir, layoutVersion],
