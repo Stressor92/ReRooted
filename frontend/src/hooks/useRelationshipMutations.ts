@@ -83,6 +83,7 @@ export function useCreateRelationship() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tree'] });
+      queryClient.invalidateQueries({ queryKey: ['person-relationships'] });
       addToast({ type: 'success', message: 'Beziehung erstellt.' });
     },
   });
@@ -97,6 +98,7 @@ export function useUpdateRelationship() {
       apiClient.put(`/relationships/${relationshipId}`, data).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tree'] });
+      queryClient.invalidateQueries({ queryKey: ['person-relationships'] });
       queryClient.invalidateQueries({ queryKey: ['person-citations'] });
       addToast({ type: 'success', message: 'Beziehung aktualisiert.' });
     },
@@ -115,6 +117,7 @@ export function useAddChild() {
       apiClient.post(`/relationships/${relationshipId}/children/${childId}`).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tree'] });
+      queryClient.invalidateQueries({ queryKey: ['person-relationships'] });
       addToast({ type: 'success', message: 'Kind verknüpft.' });
     },
     onError: (error) => {
@@ -132,6 +135,7 @@ export function useDeleteRelationship() {
       apiClient.delete(`/relationships/${relationshipId}`).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tree'] });
+      queryClient.invalidateQueries({ queryKey: ['person-relationships'] });
       addToast({ type: 'success', message: 'Beziehung entfernt.' });
     },
     onError: (error) => {

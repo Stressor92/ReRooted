@@ -143,7 +143,7 @@ export default function RelationshipDialog({ state, onClose }: RelationshipDialo
           >
             <RelationshipForm
               title={state.relationshipId ? 'Beziehung bearbeiten' : 'Beziehung anlegen'}
-              submitLabel={state.relationshipId ? 'Änderungen speichern' : 'Beziehung anlegen'}
+              submitLabel={state.relationshipId ? 'Speichern' : 'Beziehung anlegen'}
               selectedType={selectedType}
               startDate={startDate}
               endDate={endDate}

@@ -1629,11 +1629,12 @@ html[data-divider='dot'] .rerooted-person-divider::after {
 
 .rerooted-relationship-dialog {
   position: fixed;
-  top: 50%;
-  left: 50%;
+  inset: 0;
   z-index: 95;
   width: min(92vw, 380px);
-  transform: translate(-50%, -50%);
+  max-height: calc(100vh - 32px);
+  margin: auto;
+  overflow-y: auto;
 }
 
 .rerooted-relationship-form {

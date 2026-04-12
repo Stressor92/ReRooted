@@ -101,6 +101,18 @@ function relationshipTypeFromRelType(
 }
 
 function findMatchingRelationship(edge: FlowEdge, relationships: RelationshipRecord[]): RelationshipRecord | undefined {
+  const edgeRelationshipId = edge.id.startsWith('partner-')
+    ? edge.id.slice('partner-'.length)
+    : edge.id.startsWith('child-')
+      ? edge.id.slice('child-'.length).split('-').slice(0, 5).join('-')
+      : null;
+  if (edgeRelationshipId) {
+    const byId = relationships.find((relationship) => relationship.id === edgeRelationshipId);
+    if (byId) {
+      return byId;
+    }
+  }
+
   if (edge.type === 'partner') {
     return relationships.find((relationship) => {
       const parents = [relationship.person1_id, relationship.person2_id].filter(Boolean);
@@ -426,8 +438,8 @@ export default function TreeCanvas({
           targetNodeId: relationship.person2_id ?? edge.target,
           mode: 'edit',
           preferredType: relationshipTypeFromRelType(relationship.rel_type, edge.type),
-          startDate: relationship.start_date ?? '',
-          endDate: relationship.end_date ?? '',
+          startDate: relationship.start_date ?? edge.data?.start_date ?? '',
+          endDate: relationship.end_date ?? edge.data?.end_date ?? '',
         });
       } catch (error) {
         addToast({ type: 'error', message: `Beziehung konnte nicht geladen werden: ${getApiErrorMessage(error)}` });

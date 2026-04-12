@@ -67,11 +67,11 @@ export default function RelationshipForm({
       <div className="rerooted-form-grid is-compact">
         <label className="rerooted-field">
           <span>Von</span>
-          <FlexDateInput value={startDate} onChange={onStartDateChange} placeholder="Beginn optional" />
+          <FlexDateInput value={startDate} onChange={onStartDateChange} placeholder="Beginn" />
         </label>
         <label className="rerooted-field">
           <span>Bis</span>
-          <FlexDateInput value={endDate} onChange={onEndDateChange} placeholder="Ende optional" />
+          <FlexDateInput value={endDate} onChange={onEndDateChange} placeholder="Ende" />
         </label>
       </div>
 
